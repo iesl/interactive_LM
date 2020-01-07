@@ -84,9 +84,70 @@ class Dictionary(object):
             self.ind_l2_w_freq[i][2] = str(self.ind_l2_w_freq[i][2])
             f_out.write('\t'.join(self.ind_l2_w_freq[i])+'\n')
 
+class Condition_Seq2PairDataset(torch.utils.data.Dataset):
+#will need to handle the partial data loading if the dataset size is larger than cpu memory
+    def __init__(self, w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor, bptt, n_further, dilated_head_span, device):
+        self.w_ind_gpt2 = w_ind_gpt2_tensor
+        self.w_ind_spacy = w_ind_spacy_tensor
+        self.idx_gpt2_to_spacy = idx_gpt2_to_spacy_tensor
+        self.n_further = n_further
+        self.seq_len = bptt
+        #self.dilated_head_span = dilated_head_span
+        #self.head_num = int(bptt / dilated_head_span) + 2
+        self.output_device = device
+
+    def __len__(self):
+        return int( (self.w_ind_gpt2.size(0) - self.seq_len)/self.seq_len )
+
+    def __getitem__(self, idx):
+        feature = self.w_ind_gpt2[idx*self.seq_len:(idx+1)*self.seq_len].to(dtype = torch.long, device = self.output_device)
+        idx_gpt2_to_spacy_small = self.idx_gpt2_to_spacy[idx*self.seq_len:(idx+1)*self.seq_len].to(dtype = torch.long, device = self.output_device)
+        idx_gpt2_to_spacy_small = idx_gpt2_to_spacy_small - idx_gpt2_to_spacy_small[0]
+        #init_head_posi = random.randint(0, self.dilated_head_span - 1)
+        #inner_idx_tensor = torch.empty(self.head_num, dtype = torch.long, device = self.output_device)
+        #future_mask = torch.zeros( (self.head_num, self.seq_len), dtype = torch.float, device = self.output_device)
+        #for i in range(self.head_num):
+        #    inner_idx = min(self.seq_len-1, i*self.dilated_head_span+init_head_posi)
+        #    inner_idx_tensor[i] = inner_idx
+        #    future_mask[i,:inner_idx+1] = 1
+        
+        if self.idx_gpt2_to_spacy is None or self.n_further<0:
+            target_unfold = []
+        else:
+            #spacy_idx = torch.empty( (self.head_num, self.n_further), dtype = torch.long, device = self.output_device)
+            #for i in range(self.head_num):
+            #    inner_idx = inner_idx_tensor[i]
+            #    spacy_idx[i,:] = torch.tensor(list(range( self.idx_gpt2_to_spacy[idx*self.seq_len+inner_idx] - self.idx_gpt2_to_spacy[idx*self.seq_len], self.idx_gpt2_to_spacy[idx*self.seq_len+inner_idx] - self.idx_gpt2_to_spacy[idx*self.seq_len] + self.n_further )), dtype = torch.long, device = self.output_device)
+
+            start = self.idx_gpt2_to_spacy[idx*self.seq_len] + 1
+            end = min(len(self.w_ind_spacy), self.idx_gpt2_to_spacy[(idx+1)*self.seq_len] + 1 + self.n_further)
+            target_small = self.w_ind_spacy[start:end]
+            #handle the out of boundary case
+            #oob_num = end - self.w_ind_spacy.size(0)
+            #if oob_num >= 0:
+            #    target_small = torch.cat( (self.w_ind_spacy[start:],torch.zeros(oob_num+1, dtype = torch.int) ), dim=0 ).to( dtype = torch.long, device = self.output_device)
+            #else:
+            #    target_small = self.w_ind_spacy[start:end].to( dtype = torch.long, device = self.output_device)
+            target_size = target_small.size(0)
+            add_0_num = self.seq_len + self.n_further - target_size + 100
+            if add_0_num > 0:
+                target_small = torch.cat( (target_small,torch.zeros(add_0_num, dtype = torch.int) ), dim=0 ).to( dtype = torch.long, device = self.output_device)
+            else:
+                target_small = target_small.to( dtype = torch.long, device = self.output_device)
+
+
+            #target_unfold = target_small[spacy_idx]
+            #try:
+            #    target_unfold = target_small[spacy_idx]
+            #except:
+            #    print(target_small, spacy_idx, oob_num, start, end, idx, self.idx_gpt2_to_spacy[idx*self.seq_len])
+
+        #return [feature, target_unfold, inner_idx_tensor, future_mask]
+        return [feature, target_small, idx_gpt2_to_spacy_small]
+
+
 class Seq2PairDataset(torch.utils.data.Dataset):
 #will need to handle the partial data loading if the dataset size is larger than cpu memory
-#We could also use this class to put all sentences with the same length together
     def __init__(self, w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor, bptt, n_further, dilated_head_span, device):
         self.w_ind_gpt2 = w_ind_gpt2_tensor
         self.w_ind_spacy = w_ind_spacy_tensor
@@ -163,7 +224,7 @@ def load_idx2word_freq(f_in):
 
     return idx2word_freq
 
-def create_data_loader_split(f_in, bsz, bptt, n_further, dilated_head_span, device, split_num):
+def create_data_loader_split(f_in, bsz, bptt, n_further, dilated_head_span, device, split_num, dataset_class):
     w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor = torch.load(f_in, map_location='cpu')
     #print(w_ind_gpt2_tensor.size(), w_ind_spacy_tensor.size(), idx_gpt2_to_spacy_tensor.size())
     training_size = w_ind_gpt2_tensor.size(0)
@@ -178,39 +239,46 @@ def create_data_loader_split(f_in, bsz, bptt, n_further, dilated_head_span, devi
             end = (i+1) * split_size
         start_idx_spacy = idx_gpt2_to_spacy_tensor[start]
         end_idx_spacy = idx_gpt2_to_spacy_tensor[end-1]
-        dataset_arr.append(  Seq2PairDataset(w_ind_gpt2_tensor[start:end],w_ind_spacy_tensor[start_idx_spacy:end_idx_spacy], idx_gpt2_to_spacy_tensor[start:end]-start_idx_spacy, bptt, n_further, dilated_head_span, device ) ) #assume that the dataset are randomly shuffled beforehand
+        dataset_arr.append(  dataset_class(w_ind_gpt2_tensor[start:end],w_ind_spacy_tensor[start_idx_spacy:end_idx_spacy], idx_gpt2_to_spacy_tensor[start:end]-start_idx_spacy, bptt, n_further, dilated_head_span, device ) ) #assume that the dataset are randomly shuffled beforehand
 
     use_cuda = False
     if device.type == 'cude':
         use_cuda = True
-    dataloader_arr = [torch.utils.data.DataLoader(dataset_arr[i], batch_size = bsz, shuffle = True, pin_memory=use_cuda, drop_last=False) for i in range(split_num)]
+    #dataloader_arr = [torch.utils.data.DataLoader(dataset_arr[i], batch_size = bsz, shuffle = True, pin_memory=use_cuda, drop_last=False) for i in range(split_num)]
+    dataloader_arr = [torch.utils.data.DataLoader(dataset_arr[i], batch_size = bsz, shuffle = True, pin_memory=use_cuda, drop_last=True) for i in range(split_num)]
     return dataloader_arr
 
-def create_data_loader(f_in, bsz, bptt, n_further, dilated_head_span, device, want_to_shuffle = True):
+def create_data_loader(f_in, bsz, bptt, n_further, dilated_head_span, device, dataset_class, want_to_shuffle = True):
     w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor = torch.load(f_in, map_location='cpu')
-    dataset = Seq2PairDataset(w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor, bptt, n_further, dilated_head_span, device)
+    dataset = dataset_class(w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor, bptt, n_further, dilated_head_span, device)
     use_cuda = False
     if device.type == 'cude':
         use_cuda = True
-    return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=use_cuda, drop_last=False)
+    #return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=use_cuda, drop_last=False)
+    return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=use_cuda, drop_last=True)
 
 
-def load_corpus(data_path, train_bsz, eval_bsz, bptt, n_further, dilated_head_span, device, tensor_folder = "tensors", split_num = 1, skip_training = False, want_to_shuffle_val = False):
+def load_corpus(data_path, train_bsz, eval_bsz, bptt, n_further, dilated_head_span, device, tensor_folder = "tensors", split_num = 1, skip_training = False, want_to_shuffle_val = False, condition = False):
     train_corpus_name = data_path + "/" + tensor_folder + "/train.pt"
     val_org_corpus_name = data_path +"/" + tensor_folder + "/val_org.pt"
     dictionary_input_name = data_path + "/" + tensor_folder + "/dict_idx_compact"
+    
+    if condition:
+        dataset_class = Condition_Seq2PairDataset
+    else:
+        dataset_class = Seq2PairDataset
 
     with open(dictionary_input_name) as f_in:
         idx2word_freq = load_idx2word_freq(f_in)
 
     with open(val_org_corpus_name,'rb') as f_in:
-        dataloader_val = create_data_loader(f_in, eval_bsz, bptt, n_further, dilated_head_span, device, want_to_shuffle = want_to_shuffle_val)
+        dataloader_val = create_data_loader(f_in, eval_bsz, bptt, n_further, dilated_head_span, device, dataset_class, want_to_shuffle = want_to_shuffle_val)
 
     if skip_training:
         dataloader_train_arr = [0]
     else:
         with open(train_corpus_name,'rb') as f_in:
-            dataloader_train_arr = create_data_loader_split(f_in, train_bsz, bptt, n_further, dilated_head_span, device, split_num)
+            dataloader_train_arr = create_data_loader_split(f_in, train_bsz, bptt, n_further, dilated_head_span, device, split_num, dataset_class)
 
     return idx2word_freq, dataloader_train_arr, dataloader_val
 
