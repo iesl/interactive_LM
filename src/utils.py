@@ -129,7 +129,7 @@ class Condition_Seq2PairDataset(torch.utils.data.Dataset):
             #else:
             #    target_small = self.w_ind_spacy[start:end].to( dtype = torch.long, device = self.output_device)
             target_size = target_small.size(0)
-            add_0_num = self.seq_len + self.n_further - target_size + 100
+            add_0_num = self.seq_len + self.n_further - target_size + 200
             if add_0_num > 0:
                 target_small = torch.cat( (target_small,torch.zeros(add_0_num, dtype = torch.int) ), dim=0 ).to( dtype = torch.long, device = self.output_device)
             else:
@@ -163,7 +163,7 @@ class Seq2PairDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         feature = self.w_ind_gpt2[idx*self.seq_len:(idx+1)*self.seq_len].to(dtype = torch.long, device = self.output_device)
-        init_head_posi = random.randint(0, self.dilated_head_span - 1)
+        init_head_posi = random.randint(1, self.dilated_head_span - 1)
         inner_idx_tensor = torch.empty(self.head_num, dtype = torch.long, device = self.output_device)
         future_mask = torch.zeros( (self.head_num, self.seq_len), dtype = torch.float, device = self.output_device)
         for i in range(self.head_num):
@@ -296,7 +296,7 @@ def loading_all_models(args, idx2word_freq, device):
 
     model_name = 'distilgpt2'
     
-    encoder_state_dict = torch.load(os.path.join(args.checkpoint, 'encoder.pt'), map_location=device)
+    encoder_state_dict = torch.load(os.path.join(args.checkpoint_topics, 'encoder.pt'), map_location=device)
     encoder = GPT2Model.from_pretrained(model_name, state_dict = encoder_state_dict)
     gpt2_config = GPT2Config.from_pretrained(model_name)
     #encoder = model_code.SEQ2EMB(args.en_model.split('+'), ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.dropouti, args.dropoute, max_sent_len,  external_emb, [], trans_layers = args.encode_trans_layers, trans_nhid = args.trans_nhid) 
@@ -306,7 +306,7 @@ def loading_all_models(args, idx2word_freq, device):
     decoder = model_code.EMB2SEQ(args.de_model.split('+'), gpt2_config.n_embd, args.nhidlast2, output_emb_size, 1, args.n_basis, positional_option = args.positional_option, dropoutp= args.dropoutp, trans_layers = args.trans_layers, using_memory = args.de_en_connection, dropout_prob_trans = args.dropout_prob_trans) 
 
     #encoder.load_state_dict(torch.load(os.path.join(args.checkpoint, 'encoder.pt'), map_location=device))
-    decoder.load_state_dict(torch.load(os.path.join(args.checkpoint, 'decoder.pt'), map_location=device))
+    decoder.load_state_dict(torch.load(os.path.join(args.checkpoint_topics, 'decoder.pt'), map_location=device))
 
     #if len(args.emb_file) == 0:
     #    word_emb = encoder.encoder.weight.detach()
@@ -314,7 +314,7 @@ def loading_all_models(args, idx2word_freq, device):
     word_norm_emb = word_emb / (0.000000000001 + word_emb.norm(dim = 1, keepdim=True) )
     word_norm_emb[0,:] = 0
 
-    parallel_encoder, parallel_decoder = output_parallel_models(args.cuda, args.single_gpu, encoder, decoder)
+    parallel_encoder, parallel_decoder = output_parallel_models(args.cuda_topics, args.single_gpu, encoder, decoder)
 
     return parallel_encoder, parallel_decoder, encoder, decoder, word_norm_emb
 

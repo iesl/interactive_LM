@@ -220,6 +220,7 @@ class GPT2Tokenizer(PreTrainedTokenizer):
         """ Converts a sequence of tokens (string) in a single string. """
         text = "".join(tokens)
         text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors=self.errors)
+        #print(text)
         return text
 
     def save_vocabulary(self, save_directory):

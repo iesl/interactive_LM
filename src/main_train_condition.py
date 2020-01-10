@@ -71,6 +71,8 @@ parser.add_argument('--training_split_num', type=int, default=2,
                     help='We want to split training corpus into how many subsets. Splitting training dataset seems to make pytorch run much faster and we can store and eval the model more frequently')
 parser.add_argument('--valid_per_epoch', type=int, default=2,
                     help='Number of times we want to run through validation data and save model within an epoch')
+parser.add_argument('--start_training_split', type=int, default=0,
+                    help='We want to split training corpus into how many subsets. Splitting training dataset seems to make pytorch run much faster and we can store and eval the model more frequently')
 #parser.add_argument('--dropout', type=float, default=0.4,
 #                    help='dropout applied to layers (0 = no dropout)')
 #parser.add_argument('--dropouth', type=float, default=0.3,
@@ -130,7 +132,7 @@ assert args.batch_size % args.small_batch_size == 0, 'batch_size must be divisib
 
 if not args.continue_train:
     args.save = '{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
-    create_exp_dir(args.save, scripts_to_save=['./src/main_train_topics.py', './src/model.py', './src/nsd_loss.py'])
+create_exp_dir(args.save, scripts_to_save=['./src/main_train_topics.py', './src/model.py', './src/nsd_loss.py'])
 
 
 def logging(s, print_=True, log_=True):
@@ -185,11 +187,13 @@ w_freq = counter_to_tensor(idx2word_freq,device)
 ###############################################################################
 
 model_name = 'gpt2'
-
 gpt2_config = GPT2Config.from_pretrained(model_name)
 gpt2_config.word_emb_dim = output_emb_size
-encoder = GPT2LMHeadModel.from_pretrained(model_name, config = gpt2_config)
-
+if not args.continue_train:
+    encoder = GPT2LMHeadModel.from_pretrained(model_name, config = gpt2_config)
+else:
+    encoder_state_dict = torch.load(os.path.join(args.save, 'encoder.pt'), map_location=device)
+    encoder = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config)
 #if args.continue_train:
 #    #model = torch.load(os.path.join(args.save, 'model.pt'))
 #    model.load_state_dict(torch.load(os.path.join(args.save, 'model.pt')))
@@ -344,6 +348,10 @@ elif args.optimizer == 'Adam':
 elif args.optimizer == 'AdamW':
     optimizer_e = AdamW(encoder.parameters(), lr=args.lr, weight_decay=args.wdecay)
 
+if args.continue_train:
+    optimizer_e_state_dict = torch.load(os.path.join(args.save, 'optimizer_e.pt'), map_location=device)
+    optimizer_e.load_state_dict(optimizer_e_state_dict)
+
 lr = args.lr
 best_val_loss = None
 nonmono_count = 0
@@ -352,6 +360,9 @@ saving_freq = int(math.floor(args.training_split_num / args.valid_per_epoch))
 for epoch in range(1, args.epochs+1):
     epoch_start_time = time.time()
     for i in range(len(dataloader_train_arr)):
+        if epoch == 1 and i < args.start_training_split:
+            print("Skipping epoch "+str(epoch) + ' split '+str(i) )
+            continue
         train_one_epoch(dataloader_train_arr[i], external_emb, lr, i)
         
         if i != args.training_split_num - 1 and (i + 1) % saving_freq != 0:
