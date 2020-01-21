@@ -1,14 +1,14 @@
 import torch
-import nsd_loss
+#import nsd_loss
 import numpy as np
-from scipy.spatial import distance
+#from scipy.spatial import distance
 import gc
 import sys
 import torch.utils.data
 import json
 import torch.nn.functional as F
 from utils import str2bool
-sys.path.insert(0, sys.path[0]+'/testing/sim')
+#sys.path.insert(0, sys.path[0]+'/testing/sim')
 import math
 import random
 import re
@@ -127,10 +127,45 @@ def visualize_topics_val(dataloader, parallel_encoder, parallel_decoder, word_no
             if i_batch >= max_batch_num:
                 break
 
-def insert_substring(sent, insert_loc, insert_substring):
-    return sent[:insert_loc] + insert_substring + sent[insert_loc:]
 
-def print_sampled_sent(selected_topic_idx, generated_sent, top_index_im, idx2word_freq, outf, print_prefix):
+def print_sampled_sent(selected_topic_idx, generated_sent, top_index_im, idx2word_freq, outf, print_prefix, selected_word_idx=None):
+    def insert_substring(sent, insert_loc, insert_substring):
+        return sent[:insert_loc] + insert_substring + sent[insert_loc:]
+    
+    def highlight_words(word_nn, generated_sent, topic_l2_word_d2_count_t):
+        def find_all(a_str, sub):
+            start = 0
+            while True:
+                start = a_str.find(sub, start)
+                if start == -1: return
+                yield start
+                start += len(sub) # use start += 1 to find overlapping matches
+        index_shift = 0
+
+        #for m in re.finditer(word_nn, generated_sent):
+        #    start = m.start() + index_shift
+        #    end = m.end() + index_shift
+        for m_start in find_all(generated_sent, word_nn):
+            start = m_start + index_shift
+            end = m_start + len(word_nn) + index_shift
+            #print(generated_sent)
+            #print(word_nn)
+            #print(start, end)
+            #if start != 0 and generated_sent[start-1] != ' ' and end >= len(generated_sent) - 1 and generated_sent[end+1] != ' ':
+            if end < len(generated_sent) - 1 and generated_sent[end+1] != ' ' and start != 0 and generated_sent[start-1] != ' ': 
+                continue
+            if word_nn not in topic_l2_word_d2_count_t:
+                topic_l2_word_d2_count_t[word_nn] = 0
+            topic_l2_word_d2_count_t[word_nn] += 1
+            prev_start = generated_sent[:start].rfind(colorama.Fore.RED)
+            prev_end = generated_sent[:start].rfind(colorama.Style.RESET_ALL)
+            if prev_start > prev_end:
+                continue
+            generated_sent = insert_substring(generated_sent, end, colorama.Style.RESET_ALL)
+            generated_sent = insert_substring(generated_sent, start, colorama.Fore.RED)
+            index_shift += len(colorama.Style.RESET_ALL) + len(colorama.Fore.RED)
+        return generated_sent
+        
     num_selected = len(selected_topic_idx)
     top_k = top_index_im.size(0)
     topic_l2_word_d2_count = [{} for t in range(num_selected)]
@@ -140,33 +175,26 @@ def print_sampled_sent(selected_topic_idx, generated_sent, top_index_im, idx2wor
             #word_nn = idx2word_freq[top_index[i_sent,m,k,topic_idx].item()][0]
             #print(top_index_im.size())
             #print(topic_idx)
+
             word_nn = idx2word_freq[top_index_im[k,topic_idx].item()][0]
-            index_shift = 0
-            for m in re.finditer(word_nn, generated_sent):
-                start = m.start() + index_shift
-                end = m.end() + index_shift
-                #print(generated_sent)
-                #print(word_nn)
-                #print(start, end)
-                #if start != 0 and generated_sent[start-1] != ' ' and end >= len(generated_sent) - 1 and generated_sent[end+1] != ' ':
-                if end < len(generated_sent) - 1 and generated_sent[end+1] != ' ' and start != 0 and generated_sent[start-1] != ' ': 
-                    continue
-                if word_nn not in topic_l2_word_d2_count[t]:
-                    topic_l2_word_d2_count[t][word_nn] = 0
-                topic_l2_word_d2_count[t][word_nn] += 1
-                prev_start = generated_sent[:start].rfind(colorama.Fore.RED)
-                prev_end = generated_sent[:start].rfind(colorama.Style.RESET_ALL)
-                if prev_start > prev_end:
-                    continue
-                generated_sent = insert_substring(generated_sent, end, colorama.Style.RESET_ALL)
-                generated_sent = insert_substring(generated_sent, start, colorama.Fore.RED)
-                index_shift += len(colorama.Style.RESET_ALL) + len(colorama.Fore.RED)
+            generated_sent = highlight_words(word_nn, generated_sent, topic_l2_word_d2_count[t])
+    num_word = 0
+    if selected_word_idx is not None:
+        num_word = len(selected_word_idx)
+        word_l2_word_d2_count = [{} for t in range(num_word)]
+        for t in range(num_word):
+            word_nn = idx2word_freq[selected_word_idx[t]][0]
+            generated_sent = highlight_words(word_nn, generated_sent, word_l2_word_d2_count[t])
     outf.write(print_prefix + ': ' + generated_sent + '\n')
     for t in range(num_selected):
         if len(topic_l2_word_d2_count[t]) == 0:
             continue
         topic_idx = selected_topic_idx[t]
         outf.write(str(topic_idx)+' topic: '+str(topic_l2_word_d2_count[t])+'\n')
+    for t in range(num_word):
+        if len(word_l2_word_d2_count[t]) == 0:
+            continue
+        outf.write('word: '+str(word_l2_word_d2_count[t])+'\n')
     outf.write('\n')
 
 def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr):
@@ -189,6 +217,8 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
                 #outf.write(str(j)+', org '+str(org_ind)+', '+str( coeff_sum[i_sent,org_ind,0] )+' - '+str( coeff_sum[i_sent,org_ind,1] )+': ')
                 outf.write( str(j) + ', ' )
                 for k in range(top_k):
+                    #print(i_sent,m,k,j, top_index.size())
+                    #print(top_index[i_sent,m,k,j].item(), len(idx2word_freq))
                     word_nn = idx2word_freq[top_index[i_sent,m,k,j].item()][0]
                     outf.write( word_nn+' {:5.3f}'.format(top_value[i_sent,m,k,j].item())+' ' )
                 outf.write('\n')
@@ -238,7 +268,7 @@ def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_
         output = torch.cat((output, prev), dim=1)
     return output
 
-def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2):
+def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, bptt_conditional):
     #topics_num = 0
     top_k = 5
     with torch.no_grad():
@@ -252,7 +282,7 @@ def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, 
             top_index = top_index.view(batch_size, num_head, top_k, n_basis)
             top_value = top_value.view(batch_size, num_head, top_k, n_basis)
             word_norm_emb_top = word_norm_emb[top_index,:]
-            word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2) / top_value.unsqueeze(-1).sum(dim = 2)
+            word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2) #/ top_value.unsqueeze(-1).sum(dim = 2)
             word_w_sum_norm = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
             word_w_sum_norm = word_w_sum_norm.to(device=device_conditional)
             #word_norm_emb_w_sum should have size (batch_size, num_head, n_basis, word emb size)
@@ -269,16 +299,24 @@ def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, 
                         continue
                     last_end = end
                     end_int = end.item()
+                    max_prompt_len = bptt_conditional - gen_sent_len
+                    start_int = 0
+                    if end_int > max_prompt_len:
+                        start_int = end_int - max_prompt_len
                     insert_loc_list.append(end_int - 1)
                     num_selection = random.randint(1, n_basis)
                     selected_topic_idx = np.sort(np.random.choice(n_basis, size=num_selection, replace = False))
                     selected_topic_idx_arr[i_sent][m] = selected_topic_idx.tolist()
                     selected_topic_idx = torch.tensor(selected_topic_idx, dtype=torch.long, device = device_conditional)
                     #compose_conditional_emb(top_value, top_index, word_norm_emb)
-                    feature_expanded = feature[i_sent,:end].unsqueeze(0).expand(num_sent_gen,end_int).to(device = device_conditional)
+                    feature_expanded = feature[i_sent,start_int:end].unsqueeze(0).expand(num_sent_gen,end_int - start_int).to(device = device_conditional)
                     future_emb_chosen = word_w_sum_norm[i_sent, m, selected_topic_idx,:].unsqueeze(0).expand(num_sent_gen,num_selection,word_norm_emb.size(-1))
                     future_emb_chosen_arr.append(future_emb_chosen)
-                    output = sample_seq(model_condition, feature_expanded, np.array(insert_loc_list), future_emb_chosen_arr, gen_sent_len, device_conditional)
+                    insert_loc_truncated = np.array(insert_loc_list) - start_int
+                    truncate_idx = 0
+                    while( insert_loc_truncated[truncate_idx] < 0 ):
+                        truncate_idx += 1
+                    output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional)
                     #print(output.size())
                     #print(gen_sent_tensor.size())
                     gen_sent_tensor[i_sent, m, :, :] = output

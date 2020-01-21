@@ -45,10 +45,12 @@ parser.add_argument('--batch_size', type=int, default=1, metavar='N',
                     help='batch size')
 parser.add_argument('--num_sent_gen', type=int, default=3, metavar='N',
                     help='In each prompt, generate how many sentences')
-parser.add_argument('--gen_sent_len', type=int, default=50, metavar='N',
+parser.add_argument('--gen_sent_len', type=int, default=100, metavar='N',
                     help='In each prompt, generate sentences with length gen_sent_len')
-#parser.add_argument('--bptt', type=int, default=512,
-parser.add_argument('--bptt', type=int, default=256,
+parser.add_argument('--bptt', type=int, default=512,
+#parser.add_argument('--bptt', type=int, default=256,
+                    help='sequence length')
+parser.add_argument('--bptt_conditional', type=int, default=256,
                     help='sequence length')
 parser.add_argument('--dilated_head_span', type=int, default=80,
                     help='The span of each head which generates the topics')
@@ -115,10 +117,10 @@ model_condition.eval()
 
 with open(args.outf, 'w') as outf:
     outf.write('Validation Prompts:\n\n')
-    utils_testing.visualize_interactive_LM(model_condition, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2)
+    utils_testing.visualize_interactive_LM(model_condition, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
     if dataloader_train:
         outf.write('Training Prompts:\n\n')
-        utils_testing.visualize_interactive_LM(model_condition, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2 )
+        utils_testing.visualize_interactive_LM(model_condition, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
 
 #test_batch_size = 1
 #test_data = batchify(corpus.test, test_batch_size, args)
