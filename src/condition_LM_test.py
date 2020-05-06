@@ -3,15 +3,19 @@ import os
 import numpy as np
 import random
 import torch
+
 #import torch.nn as nn
 #import torch.utils.data
 #import coherency_eval
 
 from utils import seed_all_randomness, load_corpus, loading_all_models, str2bool
+from run_pplm import pplm
+import ngram
 import utils_testing
 from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
 
 from gpt2_model.modeling_gpt2_condition import GPT2LMHeadModel
+from gpt2_model.modeling_gpt2 import GPT2LMHeadModel as GPT2LM
 from gpt2_model.configuration_gpt2 import GPT2Config
 
 parser = argparse.ArgumentParser(description='PyTorch Interactive LM')
@@ -45,7 +49,7 @@ parser.add_argument('--batch_size', type=int, default=1, metavar='N',
                     help='batch size')
 parser.add_argument('--num_sent_gen', type=int, default=3, metavar='N',
                     help='In each prompt, generate how many sentences')
-parser.add_argument('--gen_sent_len', type=int, default=100, metavar='N',
+parser.add_argument('--gen_sent_len', type=int, default=50, metavar='N',
                     help='In each prompt, generate sentences with length gen_sent_len')
 parser.add_argument('--bptt', type=int, default=512,
 #parser.add_argument('--bptt', type=int, default=256,
@@ -80,6 +84,8 @@ print("Loading data")
 
 device_topics = torch.device("cuda:0" if args.cuda_topics else "cpu")
 device_conditional = torch.device("cuda:1" if args.cuda_conditional else "cpu")
+device_pplm = torch.device("cuda" if args.cuda_conditional else "cpu")
+device_gpt2 = "cuda" if torch.cuda.is_available() else "cpu"
 #print(args.cuda_conditional, device_conditional)
 
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device )
@@ -95,7 +101,9 @@ print("Loading Models")
 #load topical model
 parallel_encoder, parallel_decoder, encoder, decoder, word_norm_emb = loading_all_models(args, idx2word_freq, device_topics)
 output_emb_size = word_norm_emb.size(1)
-print(next(encoder.parameters()).device)
+
+print("encoder:", next(encoder.parameters()).device)
+
 
 #load conditional LM model
 model_name = 'gpt2'
@@ -104,23 +112,43 @@ encoder_state_dict = torch.load(os.path.join(args.checkpoint_conditional, 'encod
 gpt2_config = GPT2Config.from_pretrained(model_name)
 gpt2_config.word_emb_dim = output_emb_size
 model_condition = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).cuda(device_conditional)
-print(next(model_condition.parameters()).device)
-#gpt2_config = GPT2Config.from_pretrained(model_name)
+print("model condition:", next(model_condition.parameters()).device)
+
+
+
+#load pplm model
+model_name_pplm = 'gpt2'
+
+pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, device = device_pplm)
+
+
+
+#load gpt-2 model for generating perplexity
+gpt2_model = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).cuda(device_gpt2)
+print("gpt-2:", next(gpt2_model.parameters()).device)
+
+
+
+
+
 
 #with open(args.gpt2_vocab_file) as f_in:
 #    idx_l2_w_gpt2 = utils_testing.load_gpt2_vocab(f_in)
-tokenizer_GPT2 = GPT2Tokenizer.from_pretrained('distilgpt2')
+tokenizer_GPT2 = GPT2Tokenizer.from_pretrained('gpt2')
 
 encoder.eval()
 decoder.eval()
 model_condition.eval()
+gpt2_model.eval()
+
 
 with open(args.outf, 'w') as outf:
     outf.write('Validation Prompts:\n\n')
-    utils_testing.visualize_interactive_LM(model_condition, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
+    utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
     if dataloader_train:
         outf.write('Training Prompts:\n\n')
-        utils_testing.visualize_interactive_LM(model_condition, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
+        utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
 
 #test_batch_size = 1
 #test_data = batchify(corpus.test, test_batch_size, args)
+

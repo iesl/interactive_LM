@@ -1,4 +1,6 @@
+import spacy
 import torch
+from spacy.lang.en import English
 #import nsd_loss
 import numpy as np
 #from scipy.spatial import distance
@@ -6,13 +8,19 @@ import gc
 import sys
 import torch.utils.data
 import json
+import math
 import torch.nn.functional as F
+from transformers import GPT2Tokenizer
 from utils import str2bool
 #sys.path.insert(0, sys.path[0]+'/testing/sim')
 import math
 import random
 import re
 import colorama
+import run_pplm
+from ngram import ngram
+from result_statistics import result_statistics
+
 
 def add_model_arguments(parser):
     ###decoder
@@ -197,15 +205,18 @@ def print_sampled_sent(selected_topic_idx, generated_sent, top_index_im, idx2wor
         outf.write('word: '+str(word_l2_word_d2_count[t])+'\n')
     outf.write('\n')
 
-def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr):
-    #n_basis = coeff_order.shape[1]
+
+def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats):
     batch_size, num_head, top_k, n_basis = top_index.size()
-    #batch_size, num_head = inner_idx_tensor.size()
     num_sent_gen = gen_sent_tensor.size(2)
     feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
+    # for i_sent in range(1):
     for i_sent in range(batch_size):
+        outf.write('batch number: ' + str(i_sent) + '\n')
         last_end = -1
+        # for m in range(1):
         for m in range(num_head):
+            outf.write('number of head: ' + str(m) + '\n')
             end = inner_idx_tensor[i_sent,m].item()
             if end == last_end:
                 continue
@@ -213,6 +224,7 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
             outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
             
             for j in range(n_basis):
+
                 #org_ind = coeff_order[i_sent, j]
                 #outf.write(str(j)+', org '+str(org_ind)+', '+str( coeff_sum[i_sent,org_ind,0] )+' - '+str( coeff_sum[i_sent,org_ind,1] )+': ')
                 outf.write( str(j) + ', ' )
@@ -220,7 +232,7 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
                     #print(i_sent,m,k,j, top_index.size())
                     #print(top_index[i_sent,m,k,j].item(), len(idx2word_freq))
                     word_nn = idx2word_freq[top_index[i_sent,m,k,j].item()][0]
-                    outf.write( word_nn+' {:5.3f}'.format(top_value[i_sent,m,k,j].item())+' ' )
+                    outf.write( word_nn+' {:5.3f}'.format(top_value[i_sent,m,k,j].item())+', ' )
                 outf.write('\n')
             outf.write('\n')
             selected_topic_idx = selected_topic_idx_arr[i_sent][m]
@@ -231,11 +243,16 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
                 #make this a function
                 generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor[i_sent, m, j, :].tolist()] )
                 print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
+                result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             for j in range(num_sent_gen):
                 generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
                 print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
+                result_stats.update("Original", gen_sent_tensor_org[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
+            for j in range(num_sent_gen):
+                sentence = torch.tensor(tokenizer_GPT2.encode(pplm_sent[i_sent][m][j]), device="cuda", dtype=torch.long)
+                print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
+                result_stats.update("PPLM", sentence, feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             outf.write('\n\n')
-    
 
 def top_k_logits(logits, k):
     #modified from https://github.com/graykode/gpt-2-Pytorch/blob/master/GPT2/sample.py
@@ -246,7 +263,7 @@ def top_k_logits(logits, k):
     return torch.where(logits < min_values, torch.ones_like(logits, dtype=logits.dtype) * -1e10, logits)
 
 def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_sent_len, device, temperature=1, top_k = 40, sample=True):
-    #modified from https://github.com/graykode/gpt-2-Pytorch/blob/master/GPT2/sample.py
+    #modified from https://github.com/graykode/gpt-2-Pytorch/lob/master/GPT2/sample.py
     prev = context
     batch_size = prev.size(0)
     output = torch.zeros((batch_size, 0), dtype=torch.long, device = device  )
@@ -268,32 +285,50 @@ def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_
         output = torch.cat((output, prev), dim=1)
     return output
 
-def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, bptt_conditional):
-    #topics_num = 0
+
+def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, bptt_conditional):
     top_k = 5
     with torch.no_grad():
+        result_stats = result_statistics(gpt2_model)
+        result_stats.add_model("Model condition")
+        result_stats.add_model("Original")
+        result_stats.add_model("PPLM")
         for i_batch, sample_batched in enumerate(dataloader):
-            print(i_batch, )
+            # if i_batch == 0:
+            #     continue
+            print("batch"+str(i_batch))
             sys.stdout.flush()
             feature, target_unfold, inner_idx_tensor, future_mask = sample_batched
+            feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
 
             basis_norm_pred, top_value, top_index = predict_batch(feature, inner_idx_tensor, future_mask, parallel_encoder, parallel_decoder, word_norm_emb, n_basis, top_k, de_en_connection)
             batch_size, num_head = inner_idx_tensor.size()
+
+            # the index of each words in the vocab list
             top_index = top_index.view(batch_size, num_head, top_k, n_basis)
+            # the value of each words
             top_value = top_value.view(batch_size, num_head, top_k, n_basis)
+
             word_norm_emb_top = word_norm_emb[top_index,:]
-            word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2) #/ top_value.unsqueeze(-1).sum(dim = 2)
+            word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2) / top_value.unsqueeze(-1).sum(dim = 2)
             word_w_sum_norm = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
             word_w_sum_norm = word_w_sum_norm.to(device=device_conditional)
-            #word_norm_emb_w_sum should have size (batch_size, num_head, n_basis, word emb size)
             gen_sent_tensor = torch.empty( (batch_size, num_head, num_sent_gen, gen_sent_len), dtype=torch.long, device=device_conditional )
             gen_sent_tensor_org = torch.empty( (batch_size, num_head, num_sent_gen, gen_sent_len), dtype=torch.long, device=device_conditional )
             selected_topic_idx_arr =[ [[] for j in range(num_head)] for i in range(batch_size)]
+            pplm_sent = []
+
+            # for i_sent in range(1):
             for i_sent in range(batch_size):
+                print("sent"+str(i_sent))
                 insert_loc_list = []
                 future_emb_chosen_arr = []
                 last_end = -1
+                temp = []
+                # for m in range(1):
                 for m in range(num_head):
+                    print("head"+str(m))
+
                     end = inner_idx_tensor[i_sent,m]
                     if end == last_end:
                         continue
@@ -307,8 +342,28 @@ def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, 
                     num_selection = random.randint(1, n_basis)
                     selected_topic_idx = np.sort(np.random.choice(n_basis, size=num_selection, replace = False))
                     selected_topic_idx_arr[i_sent][m] = selected_topic_idx.tolist()
+                    # generate bag-of-words
+                    bag_of_words = []
+                    for each in selected_topic_idx.tolist():
+                        for k in range(top_k):
+                            word_nn = idx2word_freq[top_index[i_sent,m,k,each].item()][0]
+                            bag_of_words.append(word_nn)
+                        pass
+                    
+                    context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
+
+                    try:
+                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
+                    except:
+                        print(context)
+                        print(num_sent_gen)
+                        print(bag_of_words)
+                        print(gen_sent_len)
+                        sys.exit(1)
+                        print(gen_text,perplexity)
+                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
+                    temp.append(gen_text)
                     selected_topic_idx = torch.tensor(selected_topic_idx, dtype=torch.long, device = device_conditional)
-                    #compose_conditional_emb(top_value, top_index, word_norm_emb)
                     feature_expanded = feature[i_sent,start_int:end].unsqueeze(0).expand(num_sent_gen,end_int - start_int).to(device = device_conditional)
                     future_emb_chosen = word_w_sum_norm[i_sent, m, selected_topic_idx,:].unsqueeze(0).expand(num_sent_gen,num_selection,word_norm_emb.size(-1))
                     future_emb_chosen_arr.append(future_emb_chosen)
@@ -316,13 +371,15 @@ def visualize_interactive_LM(model_condition, device_conditional, num_sent_gen, 
                     truncate_idx = 0
                     while( insert_loc_truncated[truncate_idx] < 0 ):
                         truncate_idx += 1
-                    output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional)
-                    #print(output.size())
-                    #print(gen_sent_tensor.size())
+                    output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional,)
                     gen_sent_tensor[i_sent, m, :, :] = output
-                    output_org = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional)
+                    output_org = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional,)
                     gen_sent_tensor_org[i_sent, m, :, :] = output_org
-            print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr)
-
+                pplm_sent.append(temp)
+            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats)
+            result_stats.renew_ngram()
             if i_batch >= max_batch_num:
                 break
+        result_stats.print()
+        result_stats.generate_report(outf)
+        
