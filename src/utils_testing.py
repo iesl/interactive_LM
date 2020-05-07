@@ -202,7 +202,7 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
     batch_size, num_head, top_k, n_basis = top_index.size()
     #batch_size, num_head = inner_idx_tensor.size()
     num_sent_gen = gen_sent_tensor.size(2)
-    feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
+    #feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
     for i_sent in range(batch_size):
         last_end = -1
         for m in range(num_head):
@@ -210,7 +210,8 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
             if end == last_end:
                 continue
             last_end = end
-            outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
+            #outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
+            outf.write(tokenizer_GPT2.decode(feature[i_sent,:end])+'\n')
             
             for j in range(n_basis):
                 #org_ind = coeff_order[i_sent, j]
@@ -229,10 +230,12 @@ def print_basis_conditional_text(feature, idx2word_freq, top_value, top_index, i
                 #During the print, highlight the words which occur in generated sentences
                 #search directly without tokenization
                 #make this a function
-                generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor[i_sent, m, j, :].tolist()] )
+                #generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor[i_sent, m, j, :].tolist()] )
+                generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
                 print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
             for j in range(num_sent_gen):
-                generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
+                #generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
+                generated_sent_org = tokenizer_GPT2.decode( gen_sent_tensor_org[i_sent, m, j, :] )
                 print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
             outf.write('\n\n')
     

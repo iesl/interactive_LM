@@ -5,6 +5,7 @@ dataset_testing/*
 temp/*
 temp_pyrouge/*
 *.swp
+*.swo
 *.pt
 *.pyc
 models/*
