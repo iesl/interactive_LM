@@ -6,6 +6,8 @@ temp/*
 temp_pyrouge/*
 *.swp
 *.swo
+*._*.py
+src/.idea/*
 *.pt
 *.pyc
 models/*

@@ -119,8 +119,8 @@ class Condition_Seq2PairDataset(torch.utils.data.Dataset):
             #    inner_idx = inner_idx_tensor[i]
             #    spacy_idx[i,:] = torch.tensor(list(range( self.idx_gpt2_to_spacy[idx*self.seq_len+inner_idx] - self.idx_gpt2_to_spacy[idx*self.seq_len], self.idx_gpt2_to_spacy[idx*self.seq_len+inner_idx] - self.idx_gpt2_to_spacy[idx*self.seq_len] + self.n_further )), dtype = torch.long, device = self.output_device)
 
-            start = self.idx_gpt2_to_spacy[idx*self.seq_len] + 2
-            end = min(len(self.w_ind_spacy), self.idx_gpt2_to_spacy[(idx+1)*self.seq_len] + 2 + self.n_further)
+            start = self.idx_gpt2_to_spacy[idx*self.seq_len] + 1
+            end = min(len(self.w_ind_spacy), self.idx_gpt2_to_spacy[(idx+1)*self.seq_len] + 1 + self.n_further)
             target_small = self.w_ind_spacy[start:end]
             #handle the out of boundary case
             #oob_num = end - self.w_ind_spacy.size(0)
