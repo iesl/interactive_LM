@@ -48,6 +48,8 @@ parser.add_argument('--min_rest_seq_len', type=int, default=20,
                     help='The future words can only insert from 0 to (bptt - min_rest_seq_len)')
 parser.add_argument('--max_chosen_topics', type=int, default=10,
                     help='the number of chosen topics is sampled uniformly between 0 and max_chosen_topics')
+#parser.add_argument('--avg_word_num', type=int, default=1,
+#                    help='the number of word embeddings we take average before sending to GPT2 model')
 
 parser.add_argument('--optimizer', type=str, default="SGD",
                     help='optimization algorithm. Could be SGD or Adam')
@@ -280,6 +282,24 @@ def train_one_epoch(dataloader_train, external_emb, lr, split_i):
                 select_idx = torch.randint(0, args.n_further, size=(batch_size,chosen_topic_num[j]),dtype = torch.long, device = device )
                 future_toks_chosen = future_sample_space.gather(dim = 1, index= select_idx)
                 future_emb_chosen_arr.append( external_emb[future_toks_chosen,:] )
+                #future_toks_chosen_emb = external_emb[future_toks_chosen,:]
+                #if args.avg_word_num == 1 or chosen_topic_num[j]<=1:
+                #    future_emb_chosen_arr.append( future_toks_chosen_emb )
+                #else:
+                #    future_toks_all_emb = external_emb[future_sample_space,:]
+                #    merge_num = int(chosen_topic_num[j]/2)
+                #    emb_sim = torch.bmm(future_toks_chosen_emb[:,:merge_num,:], future_toks_all_emb.permute(0,2,1))
+                #    top_value, top_index = torch.topk(emb_sim, args.avg_word_num, dim = 2, sorted=False)
+                #    #top_index should have size (batch_size, merge_num, args.avg_word_num)
+                #    emb_size = future_toks_all_emb.size(2)
+                #    future_toks_all_emb_expanded = future_toks_all_emb.unsqueeze(dim=1).expand(batch_size, merge_num, future_toks_all_emb.size(1), future_toks_all_emb.size(2))
+                #    future_toks_topk_emb = future_toks_all_emb_expanded.gather(dim = 2, index = top_index.unsqueeze(dim=-1).expand(batch_size, merge_num, args.avg_word_num, emb_size))
+                #    #future_toks_topk_emb should have size (batch_size, merge_num, args.avg_word_num, emb_size)
+                #    future_toks_topk_sum_emb = torch.sum( future_toks_topk_emb * top_value.unsqueeze(-1), dim = 2) 
+                #    future_toks_topk_sum_norm_emb = future_toks_topk_sum_emb / (0.000000000001 + future_toks_topk_sum_emb.norm(dim = -1, keepdim=True))
+                #    future_toks_merge_emb = torch.cat( (future_toks_chosen_emb[:,merge_num:,:], future_toks_topk_sum_norm_emb), dim = 1)
+                #    future_toks_merge_perm_emb = future_toks_merge_emb[:, torch.randperm(chosen_topic_num[j].item(),device=device),:]
+                #    future_emb_chosen_arr.append( future_toks_merge_perm_emb )
             outputs = encoder(feature, labels=feature, insert_loc=insert_loc, future_emb_chosen_arr=future_emb_chosen_arr)
             loss = outputs[0]
         #feature.size(0) % args.dilated_head_span
