@@ -29,7 +29,7 @@ class ngram:
     def diversity_n(self):
         if len(self.unigram_list) == 0:
             return 0, 0
-        print(self.bigram_list)
+        #print(self.bigram_list)
         return len(set(self.unigram_list))/len(self.unigram_list), len(set(self.bigram_list))/len(self.bigram_list)
 
 def main():

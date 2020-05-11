@@ -60,6 +60,10 @@ parser.add_argument('--dilated_head_span', type=int, default=80,
                     help='The span of each head which generates the topics')
 parser.add_argument('--max_batch_num', type=int, default=100, 
                     help='number of batches for evaluation')
+parser.add_argument('--topic_mode', type=str, default='NSD',
+                    help='topical model we want to use. Could be NSD, radnom_word, cluster, LDA')
+parser.add_argument('--stop_word_file', type=str, default='./resources/stop_word_list',
+                    help='path to the file of a stop word list')
 
 utils_testing.add_model_arguments(parser)
 
@@ -90,9 +94,22 @@ device_gpt2 = "cuda" if torch.cuda.is_available() else "cpu"
 
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device )
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device, skip_training = True, want_to_shuffle_val = False )
-idx2word_freq, dataloader_train_arr, dataloader_val = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device_topics, args.tensor_folder, skip_training = True, want_to_shuffle_val = True )
+idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device_topics, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, load_testing = True )
 dataloader_train = dataloader_train_arr[0]
 
+if args.topic_mode != 'NSD':
+    def convert_stop_to_ind_lower(f_in, idx2word_freq):
+        stop_word_org_set = set()
+        for line in f_in:
+            w = line.rstrip()
+            stop_word_org_set.add(w)
+        stop_word_set = set()
+        for idx, (w, freq) in enumerate(idx2word_freq):
+            if w.lower() in stop_word_org_set:
+                stop_word_set.add(idx)
+        return stop_word_set
+    with open(args.stop_word_file) as f_in:
+        stop_word_set = convert_stop_to_ind_lower(f_in, idx2word_freq)
 
 ########################
 print("Loading Models")
@@ -143,12 +160,14 @@ gpt2_model.eval()
 
 
 with open(args.outf, 'w') as outf:
-    outf.write('Validation Prompts:\n\n')
-    utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
-    if dataloader_train:
-        outf.write('Training Prompts:\n\n')
-        utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
-
-#test_batch_size = 1
-#test_data = batchify(corpus.test, test_batch_size, args)
-
+    if args.topic_mode == 'NSD':
+        outf.write('Testing Prompts:\n\n')
+        utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
+        #outf.write('Validation Prompts:\n\n')
+        #utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
+        if dataloader_train:
+            outf.write('Training Prompts:\n\n')
+            utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
+    else:
+        outf.write('Testing Prompts:\n\n')
+        utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set)

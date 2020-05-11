@@ -43,6 +43,12 @@ parser.add_argument('--dilated_head_span', type=int, default=10,
                     help='The span of each head which generates the topics')
 parser.add_argument('--max_batch_num', type=int, default=100, 
                     help='number of batches for evaluation')
+parser.add_argument('--topic_models', type=str, default='NSD_vis',
+                    help='The topic models will be tested or visualized. Could be NSD_vis or NSD+kmeans_cluster+random_word+random_vocab')
+parser.add_argument('--stop_word_file', type=str, default='./resources/stop_word_list',
+                    help='path to the file of a stop word list')
+parser.add_argument('--LDA_model_path', type=str, default='',
+                    help='path to the file of a LDA mdoel')
 
 utils_testing.add_model_arguments(parser)
 
@@ -84,17 +90,34 @@ else:
     with open(args.gpt2_vocab_file) as f_in:
         idx_l2_w_gpt2 = utils_testing.load_gpt2_vocab(f_in)
 
+if args.topic_models != 'NSD_vis':
+    def convert_stop_to_ind_lower(f_in, idx2word_freq):
+        stop_word_org_set = set()
+        for line in f_in:
+            w = line.rstrip()
+            stop_word_org_set.add(w)
+        stop_word_set = set()
+        for idx, (w, freq) in enumerate(idx2word_freq):
+            if w.lower() in stop_word_org_set:
+                stop_word_set.add(idx)
+        return stop_word_set
+    with open(args.stop_word_file) as f_in:
+        stop_word_set = convert_stop_to_ind_lower(f_in, idx2word_freq)
+
 encoder.eval()
 decoder.eval()
 
 with open(args.outf, 'w') as outf:
-    outf.write('Validation Topics:\n\n')
-    #utils_testing.visualize_topics_val(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, idx_l2_w_gpt2)
-    utils_testing.visualize_topics_val(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2)
-    if dataloader_train:
-        outf.write('Training Topics:\n\n')
-        #utils_testing.visualize_topics_val(dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, idx_l2_w_gpt2 )
-        utils_testing.visualize_topics_val(dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2 )
+    if args.topic_models == 'NSD_vis':
+        outf.write('Validation Topics:\n\n')
+        #utils_testing.visualize_topics_val(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, idx_l2_w_gpt2)
+        utils_testing.visualize_topics_val(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2)
+        if dataloader_train:
+            outf.write('Training Topics:\n\n')
+            #utils_testing.visualize_topics_val(dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, idx_l2_w_gpt2 )
+            utils_testing.visualize_topics_val(dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2 )
 
-#test_batch_size = 1
-#test_data = batchify(corpus.test, test_batch_size, args)
+    #test_batch_size = 1
+    #test_data = batchify(corpus.test, test_batch_size, args)
+    else:
+        utils_testing.testing_all_topic_baselines(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, stop_word_set, args.topic_models, args.de_en_connection, args.LDA_model_path)

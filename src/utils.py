@@ -258,7 +258,7 @@ def create_data_loader(f_in, bsz, bptt, n_further, dilated_head_span, device, da
     return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=use_cuda, drop_last=True)
 
 
-def load_corpus(data_path, train_bsz, eval_bsz, bptt, n_further, dilated_head_span, device, tensor_folder = "tensors", split_num = 1, skip_training = False, want_to_shuffle_val = False, condition = False):
+def load_corpus(data_path, train_bsz, eval_bsz, bptt, n_further, dilated_head_span, device, tensor_folder = "tensors", split_num = 1, skip_training = False, want_to_shuffle_val = False, condition = False, load_testing = False):
     train_corpus_name = data_path + "/" + tensor_folder + "/train.pt"
     val_org_corpus_name = data_path +"/" + tensor_folder + "/val_org.pt"
     dictionary_input_name = data_path + "/" + tensor_folder + "/dict_idx_compact"
@@ -273,14 +273,22 @@ def load_corpus(data_path, train_bsz, eval_bsz, bptt, n_further, dilated_head_sp
 
     with open(val_org_corpus_name,'rb') as f_in:
         dataloader_val = create_data_loader(f_in, eval_bsz, bptt, n_further, dilated_head_span, device, dataset_class, want_to_shuffle = want_to_shuffle_val)
-
+    
+    if load_testing:
+        test_org_corpus_name = data_path +"/" + tensor_folder + "/test_org.pt"
+        with open(test_org_corpus_name,'rb') as f_in:
+            dataloader_test = create_data_loader(f_in, eval_bsz, bptt, n_further, dilated_head_span, device, dataset_class, want_to_shuffle = want_to_shuffle_val)
+    
     if skip_training:
         dataloader_train_arr = [0]
     else:
         with open(train_corpus_name,'rb') as f_in:
             dataloader_train_arr = create_data_loader_split(f_in, train_bsz, bptt, n_further, dilated_head_span, device, split_num, dataset_class)
 
-    return idx2word_freq, dataloader_train_arr, dataloader_val
+    if load_testing:
+        return idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test
+    else:
+        return idx2word_freq, dataloader_train_arr, dataloader_val
 
 def load_emb_from_path(emb_file_path, device, idx2word_freq):
     if emb_file_path[-3:] == '.pt':

@@ -300,7 +300,7 @@ def get_classifier(
 def get_bag_of_words_indices(bag_of_words: List[str], tokenizer) -> List[List[List[int]]]:
     bow_indices = []
     
-    bow_indices.append([tokenizer.encode(word.strip(), add_prefix_space=True) for word in bag_of_words])
+    bow_indices.append([tokenizer.encode(word.strip(), add_prefix_space=True, add_special_tokens=False) for word in bag_of_words])
 
     return bow_indices
 
