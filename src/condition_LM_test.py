@@ -147,8 +147,6 @@ print("gpt-2:", next(gpt2_model.parameters()).device)
 
 
 
-
-
 #with open(args.gpt2_vocab_file) as f_in:
 #    idx_l2_w_gpt2 = utils_testing.load_gpt2_vocab(f_in)
 tokenizer_GPT2 = GPT2Tokenizer.from_pretrained('gpt2')

@@ -73,6 +73,7 @@ class result_statistics:
 
     def __init__(self, model):
         self.model_results = {}
+        #self.model_results["time_count"] = 0
         self.gpt2_model = model
 
     def add_model(self, model_name):
@@ -89,6 +90,8 @@ class result_statistics:
         self.model_results[model_name]["ngram"] = ngram()
         self.model_results[model_name]["unigram"] = 0
         self.model_results[model_name]["bigram"] = 0
+        self.model_results[model_name]["time_sum"] = 0
+        self.model_results[model_name]["time_count"] = 0
 
     def update(self, model_name, sentence, context, selected_topic_idx, top_index, idx2word_freq, tokenizer):
         generated_sent = tokenizer.convert_tokens_to_string( [tokenizer._convert_id_to_token(x) for x in sentence.tolist()] )
@@ -116,8 +119,6 @@ class result_statistics:
             print(model["ngram"].diversity_n())
 
 
-
-
     def print(self):
         for model_name, model in self.model_results.items():
             print(model_name, "count: ", model["count"])
@@ -131,6 +132,7 @@ class result_statistics:
             print(model_name, "perplexity: ", math.exp(model["perplexity"] / model["count"]))
             print(model_name, "unigram: ", model["unigram"] / model["batch count"])
             print(model_name, "bigram: ", model["bigram"] / model["batch count"])
+            print(model_name, "running time: ", model["time_sum"] / model['time_count'])
             print()
 
 
@@ -149,6 +151,7 @@ class result_statistics:
             outf.write(model_name + " " + "perplexity: " + str(math.exp(model["perplexity"] / model["count"])) + '\n')
             outf.write(model_name + " " + "unigram: " + str(model["unigram"] / model["batch count"]) + '\n')
             outf.write(model_name + " " + "bigram: " + str(model["bigram"] / model["batch count"]) + '\n')
+            outf.write(model_name + " " + "running time: " + str(model["time_sum"] / model['time_count']) + '\n')
             outf.write('\n')
     
 

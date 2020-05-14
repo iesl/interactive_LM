@@ -49,6 +49,8 @@ parser.add_argument('--stop_word_file', type=str, default='./resources/stop_word
                     help='path to the file of a stop word list')
 parser.add_argument('--LDA_model_path', type=str, default='',
                     help='path to the file of a LDA mdoel')
+parser.add_argument('--word_emb_center_path', type=str, default='',
+                    help='path to the file of a clustering results in a word embedding space')
 
 utils_testing.add_model_arguments(parser)
 
@@ -78,6 +80,8 @@ device = torch.device("cuda" if args.cuda_topics else "cpu")
 idx2word_freq, dataloader_train_arr, dataloader_val = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = True )
 dataloader_train = dataloader_train_arr[0]
 
+utils_testing.compute_freq_prob_idx2word(idx2word_freq)
+
 ########################
 print("Loading Models")
 ########################
@@ -97,7 +101,7 @@ if args.topic_models != 'NSD_vis':
             w = line.rstrip()
             stop_word_org_set.add(w)
         stop_word_set = set()
-        for idx, (w, freq) in enumerate(idx2word_freq):
+        for idx, (w, freq, prob) in enumerate(idx2word_freq):
             if w.lower() in stop_word_org_set:
                 stop_word_set.add(idx)
         return stop_word_set
@@ -120,4 +124,4 @@ with open(args.outf, 'w') as outf:
     #test_batch_size = 1
     #test_data = batchify(corpus.test, test_batch_size, args)
     else:
-        utils_testing.testing_all_topic_baselines(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, stop_word_set, args.topic_models, args.de_en_connection, args.LDA_model_path)
+        utils_testing.testing_all_topic_baselines(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, stop_word_set, args.topic_models, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path)

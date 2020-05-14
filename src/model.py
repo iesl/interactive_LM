@@ -7,6 +7,21 @@ from torch.autograd import Variable
 import model_trans
 import sys
 #from weight_drop import WeightDrop
+class SparseCoding(nn.Module):
+    def __init__(self, ntopic, nbow, emb_size, device):
+        super(SparseCoding, self).__init__()
+        self.code_book = nn.Parameter(torch.randn(ntopic, emb_size, device=device, requires_grad=True))
+        self.coeff = nn.Parameter(torch.randn(nbow, ntopic,  device=device, requires_grad=True))
+        self.device = device
+    
+    def compute_coeff_pos(self):
+        self.coeff.data = self.coeff.clamp(0.0, 1.0)
+        #self.coeff.data = self.coeff.clamp(0.0)
+    
+    def forward(self):
+        result = self.coeff.matmul(self.code_book)
+        return result
+
 
 class MatrixReconstruction(nn.Module):
     def __init__(self, batch_size, ntopic, nbow, device):
