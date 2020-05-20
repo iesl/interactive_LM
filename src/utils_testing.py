@@ -288,7 +288,7 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                     topics[j]["weights"].append(' {:5.3f}'.format(top_value[i_sent,m,k,j].item()))
                 outf.write('\n')
             outf.write('\n')
-            prev, last = saparateParagraph(tokenizer_GPT2.decode(feature[i_sent,:end]))
+            prev, last = saparateParagraph(context)
             selected_topic_idx = selected_topic_idx_arr[i_sent][m]
             # selected_topic = '|'.join(generateString(topics[x]) for x in selected_topic_idx)
             selected_topics= ' | '.join([generateString(topics[x]) for x in selected_topic_idx])
