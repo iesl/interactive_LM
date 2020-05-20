@@ -228,7 +228,7 @@ def print_sampled_sent(selected_topic_idx, generated_sent, top_index_im, idx2wor
 def saparateParagraph(paragraph):
     i = 0
     res = ''
-    while i < 100:
+    while i < 30:
         if paragraph.find(' ') < 0:
             return '', paragraph + res
         last = paragraph.rindex(' ')
@@ -236,6 +236,9 @@ def saparateParagraph(paragraph):
         paragraph = paragraph[:last]
         i+=1
     return paragraph, res
+
+def generateString(topic):
+    return topic["name"]+": "+', '.join([each for each in topic["keywords"]])
 
 def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats, csvOutf):
     batch_size, num_head, top_k, n_basis = top_index.size()
@@ -260,18 +263,23 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 #org_ind = coeff_order[i_sent, j]
                 #outf.write(str(j)+', org '+str(org_ind)+', '+str( coeff_sum[i_sent,org_ind,0] )+' - '+str( coeff_sum[i_sent,org_ind,1] )+': ')
                 outf.write( str(j) + ', ' )
-                topics[j] = str(j) + ', ' 
+                topics[j] = {}
+                topics[j]["name"] = str(j) 
+                topics[j]["keywords"] = []
+                topics[j]["weights"] = []
                 for k in range(top_k):
                     #print(i_sent,m,k,j, top_index.size())
                     #print(top_index[i_sent,m,k,j].item(), len(idx2word_freq))
                     word_nn = idx2word_freq[top_index[i_sent,m,k,j].item()][0]
                     outf.write( word_nn+' {:5.3f}'.format(top_value[i_sent,m,k,j].item())+', ' )
-                    topics[j] +=  word_nn+' {:5.3f}'.format(top_value[i_sent,m,k,j].item())+', ' 
+                    topics[j]["keywords"].append(word_nn)
+                    topics[j]["weights"].append(' {:5.3f}'.format(top_value[i_sent,m,k,j].item()))
                 outf.write('\n')
             outf.write('\n')
             prev, last = saparateParagraph(tokenizer_GPT2.decode(feature[i_sent,:end]))
             selected_topic_idx = selected_topic_idx_arr[i_sent][m]
-            selected_topic = ('\n'.join([topics[x] for x in selected_topic_idx]))
+            # selected_topic = '|'.join(generateString(topics[x]) for x in selected_topic_idx)
+            selected_topics= ' | '.join([generateString(topics[x]) for x in selected_topic_idx])
             outf.write('Select these topics '+' '.join([str(x) for x in selected_topic_idx])+'\n')
 
             if len(pplm_sent[i_sent][m][0]) == 0:
@@ -284,19 +292,19 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 #make this a function
                 #generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor[i_sent, m, j, :].tolist()] )
                 generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
-                csvOutf.writerow([prev, last, topics[0], topics[1], topics[2], topics[3], topics[4], topics[5], topics[6], topics[7], topics[8], topics[9], selected_topic, generated_sent, 'model condition '+ str(j)])
+                csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, generated_sent, 'model condition '+ str(j)])
                 print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
                 result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             if gen_sent_tensor_org.size(0) > 0:
                 for j in range(num_sent_gen):
                     #generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
                     generated_sent_org = tokenizer_GPT2.decode( gen_sent_tensor_org[i_sent, m, j, :] )
-                    csvOutf.writerow([prev, last, topics[0], topics[1], topics[2], topics[3], topics[4], topics[5], topics[6], topics[7], topics[8], topics[9], selected_topic, generated_sent_org, 'Original '+ str(j)])
+                    csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, generated_sent_org, 'Original '+ str(j)])
                     print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
                     result_stats.update("Original", gen_sent_tensor_org[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             for j in range(num_sent_gen):
                 sentence = torch.tensor(tokenizer_GPT2.encode(pplm_sent[i_sent][m][j]), device="cuda", dtype=torch.long)
-                csvOutf.writerow([prev, last, topics[0], topics[1], topics[2], topics[3], topics[4], topics[5], topics[6], topics[7], topics[8], topics[9], selected_topic, pplm_sent[i_sent][m][j], 'PPLM '+ str(j)])
+                csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, pplm_sent[i_sent][m][j], 'PPLM '+ str(j)])
                 print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
                 result_stats.update("PPLM", sentence, feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             outf.write('\n\n')

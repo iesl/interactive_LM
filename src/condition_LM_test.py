@@ -156,7 +156,7 @@ decoder.eval()
 model_condition.eval()
 gpt2_model.eval()
 
-with open('gen_log/output.csv', 'w') as csvOutf:
+with open('gen_log/output.csv', 'w', encoding='utf-8') as csvOutf:
     with open(args.outf, 'w') as outf:
         if args.topic_mode == 'NSD':
             outf.write('Testing Prompts:\n\n')
