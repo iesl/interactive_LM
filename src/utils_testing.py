@@ -242,7 +242,15 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 continue
             last_end = end
             #outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
-            outf.write(tokenizer_GPT2.decode(feature[i_sent,:end])+'\n')
+            context = tokenizer_GPT2.decode(feature[i_sent,:end]).replace('â',"'")
+            try:
+                context.encode('ascii', 'strict')
+            except:
+                outf.write("Skip {} sent {} head due to special token\n".format(i_sent, m))
+                continue
+            
+            #outf.write(tokenizer_GPT2.decode(feature[i_sent,:end])+'\n')
+            outf.write(context+'\n')
             
             for j in range(n_basis):
 
@@ -378,11 +386,21 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                 # for m in range(1):
                 for m in range(num_head):
                     print("head"+str(m))
+                    
 
                     end = inner_idx_tensor[i_sent,m]
                     if end == last_end:
                         continue
                     last_end = end
+                    
+                    context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
+                    try:
+                        context.replace('â',"'").encode('ascii', 'strict')
+                    except:
+                        gen_text = ['']*num_sent_gen   
+                        temp.append(gen_text)
+                        continue
+
                     end_int = end.item()
                     max_prompt_len = bptt_conditional - gen_sent_len
                     start_int = 0
@@ -421,12 +439,13 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     
                     #gen_text = tokenizer_GPT2.decode(output)
                     t = time.time()
-                    context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
-                    try:
-                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
-                    except:
-                        print("Skipping {} batch, {} paragraph, and {} head because PPLM cannot condition on any word".format(i_batch,i_sent,m))
-                        gen_text = ['']*num_sent_gen
+                    #context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
+                    #try:
+                    #    gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
+                    #except:
+                    #    print("Skipping {} batch, {} paragraph, and {} head because PPLM cannot condition on any word".format(i_batch,i_sent,m))
+                    #    gen_text = ['']*num_sent_gen
+                    gen_text = ['']*num_sent_gen
                         #print(context)
                         #print(num_sent_gen)
                         #print(bag_of_words)
