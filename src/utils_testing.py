@@ -225,8 +225,22 @@ def print_sampled_sent(selected_topic_idx, generated_sent, top_index_im, idx2wor
         outf.write('word: '+str(word_l2_word_d2_count[t])+'\n')
     outf.write('\n')
 
+def saparateParagraph(paragraph):
+    i = 0
+    res = ''
+    while i < 30:
+        if paragraph.find(' ') < 0:
+            return '', paragraph + res
+        last = paragraph.rindex(' ')
+        res = paragraph[last:] + res
+        paragraph = paragraph[:last]
+        i+=1
+    return paragraph, res
 
-def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats):
+def generateString(topic):
+    return topic["name"]+": "+', '.join([each for each in topic["keywords"]])
+
+def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats, csvOutf):
     batch_size, num_head, top_k, n_basis = top_index.size()
     num_sent_gen = gen_sent_tensor.size(2)
     #feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
@@ -243,6 +257,9 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
             last_end = end
             #outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
             context = tokenizer_GPT2.decode(feature[i_sent,:end]).replace('â',"'")
+            if len(context.split()) < 20:
+                outf.write("Skip {} sent {} head due to short context\n".format(i_sent, m))
+                continue
             try:
                 context.encode('ascii', 'strict')
             except:
@@ -252,19 +269,29 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
             #outf.write(tokenizer_GPT2.decode(feature[i_sent,:end])+'\n')
             outf.write(context+'\n')
             
+            topics = dict()
             for j in range(n_basis):
 
                 #org_ind = coeff_order[i_sent, j]
                 #outf.write(str(j)+', org '+str(org_ind)+', '+str( coeff_sum[i_sent,org_ind,0] )+' - '+str( coeff_sum[i_sent,org_ind,1] )+': ')
                 outf.write( str(j) + ', ' )
+                topics[j] = {}
+                topics[j]["name"] = str(j) 
+                topics[j]["keywords"] = []
+                topics[j]["weights"] = []
                 for k in range(top_k):
                     #print(i_sent,m,k,j, top_index.size())
                     #print(top_index[i_sent,m,k,j].item(), len(idx2word_freq))
                     word_nn = idx2word_freq[top_index[i_sent,m,k,j].item()][0]
                     outf.write( word_nn+' {:5.3f}'.format(top_value[i_sent,m,k,j].item())+', ' )
+                    topics[j]["keywords"].append(word_nn)
+                    topics[j]["weights"].append(' {:5.3f}'.format(top_value[i_sent,m,k,j].item()))
                 outf.write('\n')
             outf.write('\n')
+            prev, last = saparateParagraph(tokenizer_GPT2.decode(feature[i_sent,:end]))
             selected_topic_idx = selected_topic_idx_arr[i_sent][m]
+            # selected_topic = '|'.join(generateString(topics[x]) for x in selected_topic_idx)
+            selected_topics= ' | '.join([generateString(topics[x]) for x in selected_topic_idx])
             outf.write('Select these topics '+' '.join([str(x) for x in selected_topic_idx])+'\n')
 
             if len(pplm_sent[i_sent][m][0]) == 0:
@@ -277,16 +304,19 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 #make this a function
                 #generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor[i_sent, m, j, :].tolist()] )
                 generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
+                csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, generated_sent, 'model condition '+ str(j)])
                 print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
                 result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             if gen_sent_tensor_org.size(0) > 0:
                 for j in range(num_sent_gen):
                     #generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
                     generated_sent_org = tokenizer_GPT2.decode( gen_sent_tensor_org[i_sent, m, j, :] )
+                    csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, generated_sent_org, 'Original '+ str(j)])
                     print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
                     result_stats.update("Original", gen_sent_tensor_org[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             for j in range(num_sent_gen):
                 sentence = torch.tensor(tokenizer_GPT2.encode(pplm_sent[i_sent][m][j]), device="cuda", dtype=torch.long)
+                csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, pplm_sent[i_sent][m][j], 'PPLM '+ str(j)])
                 print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
                 result_stats.update("PPLM", sentence, feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
             outf.write('\n\n')
@@ -344,7 +374,7 @@ def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_
     return output
 
 
-def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, bptt_conditional):
+def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, bptt_conditional, csvOutf):
     top_k = 5
     with torch.no_grad():
         result_stats = result_statistics(gpt2_model)
@@ -390,10 +420,17 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
 
                     end = inner_idx_tensor[i_sent,m]
                     if end == last_end:
+                        gen_text = ['']*num_sent_gen   
+                        temp.append(gen_text)
                         continue
                     last_end = end
                     
                     context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
+                    if len(context.split()) < 20:
+                        gen_text = ['']*num_sent_gen   
+                        temp.append(gen_text)
+                        continue
+                        
                     try:
                         context.replace('â',"'").encode('ascii', 'strict')
                     except:
@@ -440,12 +477,12 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     #gen_text = tokenizer_GPT2.decode(output)
                     t = time.time()
                     #context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
-                    #try:
-                    #    gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
-                    #except:
-                    #    print("Skipping {} batch, {} paragraph, and {} head because PPLM cannot condition on any word".format(i_batch,i_sent,m))
-                    #    gen_text = ['']*num_sent_gen
-                    gen_text = ['']*num_sent_gen
+                    try:
+                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
+                    except:
+                        print("Skipping {} batch, {} paragraph, and {} head because PPLM cannot condition on any word".format(i_batch,i_sent,m))
+                        gen_text = ['']*num_sent_gen
+                    #gen_text = ['']*num_sent_gen
                         #print(context)
                         #print(num_sent_gen)
                         #print(bag_of_words)
@@ -463,7 +500,7 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                             result_stats.model_results[method_name]["time_count"] += 1
 
                 pplm_sent.append(temp)
-            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats)
+            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats, csvOutf)
             #result_stats.renew_ngram()
             if i_batch + 1 >= max_batch_num:
                 break
@@ -806,7 +843,7 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
         topic_result_stats.generate_report(sys.stdout)
 
 
-def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set):
+def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, csvOutf):
     top_k = 5
     nlp = English()
     word_d2_idx = {}
@@ -925,7 +962,7 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                     #output_org = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional,)
                     #gen_sent_tensor_org[i_sent, m, :, :] = output_org
                 pplm_sent.append(temp)
-            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats)
+            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, gpt2_model, result_stats, csvOutf)
             result_stats.renew_ngram()
             if i_batch + 1 >= max_batch_num:
                 break
