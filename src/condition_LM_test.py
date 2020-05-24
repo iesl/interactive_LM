@@ -161,7 +161,7 @@ with open('gen_log/output.csv', 'w', encoding='utf-8') as csvOutf:
         if args.topic_mode == 'NSD':
             outf.write('Testing Prompts:\n\n')
             csvOutf = writer(csvOutf)
-            csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic 0', 'topic 1', 'topic 2', 'topic 3', 'topic 4', 'topic 5', 'topic 6', 'topic 7', 'topic 8', 'topic 9', 'selected topics', 'sentence', 'model'])
+            csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic_0', 'topic_1', 'topic_2', 'topic_3', 'topic_4', 'topic_5', 'topic_6', 'topic_7', 'topic_8', 'topic_9', 'selected topics', 'sentence', 'model'])
             utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional, csvOutf)
             #outf.write('Validation Prompts:\n\n')
             #utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
