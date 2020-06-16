@@ -2,6 +2,9 @@ import torch
 import os
 import math
 from ngram import ngram
+from spacy.lang.en import English
+import nltk
+import sys
 
 def sample_statistics(selected_topic_idx, generated_sent, top_index_im, idx2word_freq, selected_word_idx=None):
     def highlight_words(word_nn, generated_sent, topic_l2_word_d2_count_t, exact_count):
@@ -68,6 +71,25 @@ def perplexity(model, context, generated_sent, tokenizer):
     outputs_GPT2LMHeadModel= model(feature, labels=feature_generated)
     return outputs_GPT2LMHeadModel[0]
 
+def eval_using_BLEU(generated_sentence, word_raw_list_i_j, word_raw_rest_list_i_j, spacy_nlp):
+    if len(word_raw_list_i_j) <= 1:
+        return -1, -1
+    future_window_size = 25
+    if len(word_raw_rest_list_i_j) <= future_window_size + 1:
+        return -1, -1
+
+    doc = spacy_nlp(generated_sentence)
+    gen_list = []
+    for tok in doc:
+        gen_list.append(tok.text)
+    #print(word_raw_list_i_j[:-1])
+    #print(word_raw_rest_list_i_j[1:future_window_size + 1])
+    #print(gen_list)
+    sys.stdout.flush()
+    cc = nltk.translate.bleu_score.SmoothingFunction()
+    context_BLEU = nltk.translate.bleu_score.sentence_bleu([word_raw_list_i_j[:-1]], gen_list, weights = (0.5, 0.5), smoothing_function=cc.method3)
+    BLEU = nltk.translate.bleu_score.sentence_bleu([word_raw_rest_list_i_j[1:future_window_size + 1]], gen_list, weights = (0.5, 0.5), smoothing_function=cc.method3)
+    return BLEU, context_BLEU 
 
 class result_statistics:
 
@@ -75,11 +97,16 @@ class result_statistics:
         self.model_results = {}
         #self.model_results["time_count"] = 0
         self.gpt2_model = model
+        self.nlp = English()
 
     def add_model(self, model_name):
         self.model_results[model_name] = {}
         self.model_results[model_name]["batch count"] = 0
         self.model_results[model_name]["count"] = 0
+        self.model_results[model_name]["BLEU_count"] = 0
+        self.model_results[model_name]["BLEU"] = 0
+        self.model_results[model_name]["context BLEU"] = 0
+        self.model_results[model_name]["self BLEU"] = 0
         self.model_results[model_name]["token hit"] = 0
         self.model_results[model_name]["word type hit"] = 0
         self.model_results[model_name]["topic hit"] = 0
@@ -93,10 +120,17 @@ class result_statistics:
         self.model_results[model_name]["time_sum"] = 0
         self.model_results[model_name]["time_count"] = 0
 
-    def update(self, model_name, sentence, context, selected_topic_idx, top_index, idx2word_freq, tokenizer):
+    def update(self, model_name, sentence, context, selected_topic_idx, top_index, idx2word_freq, tokenizer, word_raw_list_i_j=None, word_raw_rest_list_i_j=None):
         generated_sent = tokenizer.convert_tokens_to_string( [tokenizer._convert_id_to_token(x) for x in sentence.tolist()] )
         num_token_hit, num_word_type_hit, num_topic_hit = sample_statistics(selected_topic_idx, generated_sent, top_index, idx2word_freq)
         log_perplexity = perplexity(self.gpt2_model, context.unsqueeze(0), sentence.unsqueeze(0), tokenizer)
+        if word_raw_list_i_j is not None:
+            #context_sents = tokenizer.convert_tokens_to_string( [tokenizer._convert_id_to_token(x) for x in context.tolist()] )
+            BLEU, context_BLEU = eval_using_BLEU(generated_sent, word_raw_list_i_j, word_raw_rest_list_i_j, self.nlp)
+            if BLEU != -1:
+                self.model_results[model_name]["BLEU"] += BLEU
+                self.model_results[model_name]["context BLEU"] += context_BLEU
+                self.model_results[model_name]["BLEU_count"] += 1
         self.model_results[model_name]["count"] += 1
         self.model_results[model_name]["token hit"] += num_token_hit[0]
         self.model_results[model_name]["word type hit"] += num_word_type_hit[0]
@@ -122,7 +156,11 @@ class result_statistics:
     def print(self):
         for model_name, model in self.model_results.items():
             print(model_name, "count: ", model["count"])
+            print(model_name, "BLEU count: ", model["BLEU_count"])
             print(model_name, "batch count: ", model["batch count"])
+            print(model_name, "BLEU: ", model["BLEU"] / model["BLEU_count"])
+            #print(model_name, "self BLEU: ", model["self BLEU"] / model["BLEU_count"])
+            print(model_name, "context BLEU: ", model["context BLEU"] / model["BLEU_count"])
             print(model_name, "token hit: ", model["token hit"] / model["count"])
             print(model_name, "exact token hit: ", model["exact token hit"] / model["count"])
             print(model_name, "word type hit: ", model["word type hit"] / model["count"])
@@ -132,7 +170,8 @@ class result_statistics:
             print(model_name, "perplexity: ", math.exp(model["perplexity"] / model["count"]))
             print(model_name, "unigram: ", model["unigram"] / model["batch count"])
             print(model_name, "bigram: ", model["bigram"] / model["batch count"])
-            print(model_name, "running time: ", model["time_sum"] / model['time_count'])
+            if model['time_count'] > 0:
+                print(model_name, "running time: ", model["time_sum"] / model['time_count'])
             print()
 
 
@@ -141,7 +180,11 @@ class result_statistics:
         outf.write('Reports: \n')
         for model_name, model in self.model_results.items():
             outf.write(model_name + " " + "count: " + str(model["count"]) + '\n')
+            outf.write(model_name + " " + "BLEU count: " + str(model["BLEU_count"]) + '\n')
             outf.write(model_name + " " + "batch count: " + str(model["batch count"]) + '\n')
+            outf.write(model_name + " " + "BLEU: " + str(model["BLEU"] / model["BLEU_count"]) + '\n')
+            #outf.write(model_name + " " + "self BLEU: " + str(model["self BLEU"] / model["BLEU_count"]) + '\n')
+            outf.write(model_name + " " + "context BLEU: " + str(model["context BLEU"] / model["BLEU_count"]) + '\n')
             outf.write(model_name + " " + "token hit: " + str(model["token hit"] / model["count"]) + '\n')
             outf.write(model_name + " " + "exact token hit: " + str(model["exact token hit"] / model["count"]) + '\n')
             outf.write(model_name + " " + "word type hit: " + str(model["word type hit"] / model["count"]) + '\n')
@@ -151,7 +194,8 @@ class result_statistics:
             outf.write(model_name + " " + "perplexity: " + str(math.exp(model["perplexity"] / model["count"])) + '\n')
             outf.write(model_name + " " + "unigram: " + str(model["unigram"] / model["batch count"]) + '\n')
             outf.write(model_name + " " + "bigram: " + str(model["bigram"] / model["batch count"]) + '\n')
-            outf.write(model_name + " " + "running time: " + str(model["time_sum"] / model['time_count']) + '\n')
+            if model['time_count'] > 0:
+                outf.write(model_name + " " + "running time: " + str(model["time_sum"] / model['time_count']) + '\n')
             outf.write('\n')
     
 

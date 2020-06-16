@@ -62,6 +62,8 @@ parser.add_argument('--max_batch_num', type=int, default=100,
                     help='number of batches for evaluation')
 parser.add_argument('--topic_mode', type=str, default='NSD',
                     help='topical model we want to use. Could be NSD, radnom_word, cluster, LDA')
+parser.add_argument('--LDA_model_path', type=str, default='',
+                    help='path to the file of a LDA mdoel')
 parser.add_argument('--stop_word_file', type=str, default='./resources/stop_word_list',
                     help='path to the file of a stop word list')
 
@@ -94,7 +96,10 @@ device_gpt2 = "cuda" if torch.cuda.is_available() else "cpu"
 
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device )
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device, skip_training = True, want_to_shuffle_val = False )
-idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device_topics, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, load_testing = True )
+random_start = False
+if args.topic_mode == "NSD":
+    random_start = True
+idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device_topics, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, load_testing = True, random_start = random_start )
 dataloader_train = dataloader_train_arr[0]
 
 if args.topic_mode != 'NSD':
@@ -120,7 +125,6 @@ parallel_encoder, parallel_decoder, encoder, decoder, word_norm_emb = loading_al
 output_emb_size = word_norm_emb.size(1)
 
 print("encoder:", next(encoder.parameters()).device)
-
 
 #load conditional LM model
 model_name = 'gpt2'
@@ -170,4 +174,4 @@ with open('gen_log/output.csv', 'w', encoding='utf-8') as csvOutf:
                 utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional, csvOutf)
         else:
             outf.write('Testing Prompts:\n\n')
-            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set)
+            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path)
