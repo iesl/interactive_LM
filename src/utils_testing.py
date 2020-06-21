@@ -246,22 +246,51 @@ def filter_generated_sents(cond_sent_list, org_sent_list, pplm_sent_list):
     org_sent_list_out = []
     pplm_sent_list_out = []
     excluding_j_set = set()
+    num_not_ascii = [0, 0, 0]
     for j in range(len(cond_sent_list)):
         cond_sent_list_out.append(cond_sent_list[j].replace('â',"'").replace('\n'," "))
         org_sent_list_out.append(org_sent_list[j].replace('â',"'").replace('\n'," "))
         pplm_sent_list_out.append(pplm_sent_list[j].replace('â',"'").replace('\n'," "))
+        exclude_this = False
         try:
             cond_sent_list_out[j].encode('ascii', 'strict')
+        except:
+            num_not_ascii[0] += 1
+            exclude_this = True
+        try:
             org_sent_list_out[j].encode('ascii', 'strict')
+        except:
+            num_not_ascii[1] += 1
+            exclude_this = True
+        try:
             pplm_sent_list_out[j].encode('ascii', 'strict')
         except:
+            num_not_ascii[2] += 1
+            exclude_this = True
+        
+        if exclude_this:
             print("Skip generated sentences due to special token")
             excluding_j_set.add(j)
-            continue
+            #continue
 
-    return cond_sent_list_out, org_sent_list_out, pplm_sent_list_out, excluding_j_set
+    return cond_sent_list_out, org_sent_list_out, pplm_sent_list_out, excluding_j_set, num_not_ascii
 
-def eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf):
+def preprocessing_context(context, outf = None):
+    bad_context = False
+    context = context.replace('â',"'").replace('\n'," ")
+    if len(context.split()) < 50:
+        if outf is not None:
+            outf.write("Skip due to short context\n")
+        bad_context = True
+    try:
+        context.encode('ascii', 'strict')
+    except:
+        if outf is not None:
+            outf.write("Skip due to special token\n")
+        bad_context = True
+    return context, bad_context
+
+def eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf, readable_context):
     batch_size, num_head, top_k, n_basis = top_index.size()
     num_sent_gen = gen_sent_tensor.size(2)
     for i_sent in range(batch_size):
@@ -275,28 +304,28 @@ def eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_in
                 continue
             last_end = end
             #outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
-            context = tokenizer_GPT2.decode(feature[i_sent,:end]).replace('â',"'").replace('\n'," ")
-            if len(context.split()) < 50:
-                #outf.write("Skip {} sent {} head due to short context\n".format(i_sent, m))
-                continue
-            try:
-                context.encode('ascii', 'strict')
-            except:
-                #outf.write("Skip {} sent {} head due to special token\n".format(i_sent, m))
-                continue
+            context = tokenizer_GPT2.decode(feature[i_sent,:end])
+            if readable_context:
+                context, bad_context = preprocessing_context(context, outf)
+                if bad_context:
+                    continue
             outf.write(context+'\n')
             selected_topic_idx = selected_topic_idx_arr[i_sent][m]
             for j in range(num_sent_gen):
                 #generated_sent = cond_sent_list[j]
                 #generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
                 #print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
-                result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m])
+                result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
+            result_stats.update_self_BLEU("Model condition")
 
-def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, result_stats, csvOutf):
+def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, csvOutf, readable_context):
     batch_size, num_head, top_k, n_basis = top_index.size()
     num_sent_gen = gen_sent_tensor.size(2)
     #feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
     # for i_sent in range(1):
+    not_ascii_conditional = 0
+    not_ascii_org = 0
+    not_ascii_PPLM = 0
     for i_sent in range(batch_size):
         outf.write('batch number: ' + str(i_sent) + '\n')
         last_end = -1
@@ -307,16 +336,23 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
             if end == last_end:
                 continue
             last_end = end
+            
             #outf.write(tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])+'\n')
-            context = tokenizer_GPT2.decode(feature[i_sent,:end]).replace('â',"'").replace('\n'," ")
-            if len(context.split()) < 50:
-                outf.write("Skip {} sent {} head due to short context\n".format(i_sent, m))
-                continue
-            try:
-                context.encode('ascii', 'strict')
-            except:
-                outf.write("Skip {} sent {} head due to special token\n".format(i_sent, m))
-                continue
+            context = tokenizer_GPT2.decode(feature[i_sent,:end])
+            #.replace('â',"'").replace('\n'," ")
+            if readable_context:
+                context, bad_context = preprocessing_context(context, outf)
+                if bad_context:
+                    continue
+
+            #if len(context.split()) < 50:
+            #    outf.write("Skip {} sent {} head due to short context\n".format(i_sent, m))
+            #    continue
+            #try:
+            #    context.encode('ascii', 'strict')
+            #except:
+            #    outf.write("Skip {} sent {} head due to special token\n".format(i_sent, m))
+            #    continue
             
             #outf.write(tokenizer_GPT2.decode(feature[i_sent,:end])+'\n')
             outf.write(context+'\n')
@@ -359,7 +395,10 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                     generated_sent_org = tokenizer_GPT2.decode( gen_sent_tensor_org[i_sent, m, j, :] )
                     org_sent_list.append(generated_sent_org)
                     
-            cond_sent_list_out, org_sent_list_out, pplm_sent_list_out, excluding_j_set = filter_generated_sents(cond_sent_list, org_sent_list, pplm_sent[i_sent][m])
+            cond_sent_list_out, org_sent_list_out, pplm_sent_list_out, excluding_j_set, num_not_ascii = filter_generated_sents(cond_sent_list, org_sent_list, pplm_sent[i_sent][m])
+            not_ascii_conditional += num_not_ascii[0]
+            not_ascii_org += num_not_ascii[1] 
+            not_ascii_PPLM += num_not_ascii[2]
             for j in range(num_sent_gen):
                 if j in excluding_j_set:
                     continue
@@ -376,20 +415,24 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 #generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
                 generated_sent = cond_sent_list[j]
                 print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
-                result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
+                result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
+            result_stats.update_self_BLEU("Model condition")
             if gen_sent_tensor_org.size(0) > 0:
                 for j in range(num_sent_gen):
                     #generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
                     #generated_sent_org = tokenizer_GPT2.decode( gen_sent_tensor_org[i_sent, m, j, :] )
                     generated_sent_org = org_sent_list[j]
                     print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
-                    result_stats.update("Original", gen_sent_tensor_org[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
+                    result_stats.update("Original", gen_sent_tensor_org[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
+                result_stats.update_self_BLEU("Original")
             for j in range(num_sent_gen):
                 print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
                 sentence = torch.tensor(tokenizer_GPT2.encode(pplm_sent[i_sent][m][j]), device="cuda", dtype=torch.long)
-                result_stats.update("PPLM", sentence, feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2)
+                result_stats.update("PPLM", sentence, feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
+            result_stats.update_self_BLEU("PPLM")
             outf.write('\n\n')
         result_stats.renew_ngram()
+    outf.write('Number of not ascii code in coditional: {}, in org: {}, in PPLM: {}\n'.format(not_ascii_conditional, not_ascii_org, not_ascii_PPLM))
 
 def top_k_logits(logits, k):
     #modified from https://github.com/graykode/gpt-2-Pytorch/blob/master/GPT2/sample.py
@@ -443,8 +486,20 @@ def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_
     return output
 
 
-def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, bptt_conditional, csvOutf):
+def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, stop_word_set, bptt_conditional, csvOutf, readable_context = False):
     top_k = 5
+    nlp = English()
+    word_d2_idx = {}
+    for idx in range(len(idx2word_freq)):
+        word = idx2word_freq[idx][0]
+        word_d2_idx[word] = idx
+
+    emb_sum = torch.sum(word_norm_emb,dim=1)
+    OOV_list = torch.nonzero(emb_sum == 0).squeeze().cpu().tolist()
+    print("OOV number = {}".format(len(OOV_list)))
+    print("OOV index examples {}".format(OOV_list[:10]))
+    OOV_set = set(OOV_list)
+
     with torch.no_grad():
         result_stats = result_statistics(gpt2_model)
         result_stats.add_model("Model condition")
@@ -475,6 +530,7 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
             selected_topic_idx_arr =[ [[] for j in range(num_head)] for i in range(batch_size)]
             pplm_sent = []
 
+            word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
             # for i_sent in range(1):
             for i_sent in range(batch_size):
                 print("sent"+str(i_sent))
@@ -495,17 +551,23 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     last_end = end
                     
                     context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
-                    if len(context.split()) < 50:
+                    context_proc, bad_context = preprocessing_context(context, outf)
+                    if bad_context:
                         gen_text = ['']*num_sent_gen   
                         temp.append(gen_text)
                         continue
+
+                    #if len(context.split()) < 50:
+                    #    gen_text = ['']*num_sent_gen   
+                    #    temp.append(gen_text)
+                    #    continue
                         
-                    try:
-                        context.replace('â',"'").encode('ascii', 'strict')
-                    except:
-                        gen_text = ['']*num_sent_gen   
-                        temp.append(gen_text)
-                        continue
+                    #try:
+                    #    context.replace('â',"'").encode('ascii', 'strict')
+                    #except:
+                    #    gen_text = ['']*num_sent_gen   
+                    #    temp.append(gen_text)
+                    #    continue
 
                     end_int = end.item()
                     max_prompt_len = bptt_conditional - gen_sent_len
@@ -569,7 +631,7 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                             result_stats.model_results[method_name]["time_count"] += 1
 
                 pplm_sent.append(temp)
-            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, result_stats, csvOutf)
+            print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, csvOutf, readable_context)
             #result_stats.renew_ngram()
             if i_batch + 1 >= max_batch_num:
                 break
@@ -635,7 +697,7 @@ def get_topic_emb(basis_norm_pred, word_norm_emb, top_k, batch_size, num_head):
     top_value = top_value.view(batch_size, num_head, top_k, n_basis)
     
     word_norm_emb_top = word_norm_emb[top_index,:]
-    word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2)/ top_value.unsqueeze(-1).sum(dim = 2)
+    word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2)/ (0.000000000001 + top_value.unsqueeze(-1).sum(dim = 2))
     word_w_sum_norm = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
     return top_value, top_index, word_w_sum_norm
 
@@ -719,7 +781,57 @@ def cluster_sampling(word_idx_list, word_norm_emb, n_basis, top_k, cluster_metho
                     basis_pred[b,j,:,:] = SC_clustering(torch.tensor(cluster_feature,device=device_topic), n_basis, max_iter = 200)
     basis_pred = basis_pred.view(batch_size * num_head, n_basis, emb_size)
     basis_norm_pred = basis_pred / (0.000000000001 + basis_pred.norm(dim = 2, keepdim=True) )
+    #if torch.isnan(basis_norm_pred).sum() > 0:
+    #    print(basis_norm_pred)
+    #    print(word_index_context)
+    #    print(cluster_feature)
+    #    sys.exit(0)
     top_value, top_index, word_w_sum_norm = get_topic_emb(basis_norm_pred, word_norm_emb, top_k, batch_size, num_head)
+    if torch.isnan(word_w_sum_norm).sum() > 0:
+        print(basis_norm_pred)
+        print(word_index_context)
+        print(cluster_feature)
+        print(word_w_sum_norm)
+        sys.exit(0)
+    return top_value, top_index, word_w_sum_norm
+
+def load_lda_model(LDA_model_path, word_d2_idx, word_norm_emb, top_k):
+    lda_model = ldamodel.LdaModel.load(LDA_model_path, mmap='r')
+    lda_word_prob_raw = lda_model.get_topics()
+    lda_id2word = lda_model.id2word
+    #id_lda_d2_id_dict = {}
+    word_num, emb_size = word_norm_emb.size()
+    lda_topic_num, num_vocab_lda = lda_word_prob_raw.shape
+    lda_word_prob = np.zeros( (lda_topic_num, word_num) )
+    for lda_id in lda_id2word:
+        word = lda_id2word[lda_id]
+        if word not in word_d2_idx:
+            continue
+        id_dict = word_d2_idx[word]
+        lda_word_prob[:,id_dict] = lda_word_prob_raw[:,lda_id]
+        #id_lda_d2_id_dict[lda_id] = id_dict
+    lda_word_prob_tensor = torch.tensor(lda_word_prob, device = word_norm_emb.device, dtype=torch.float)
+    
+    lda_top_word_value, lda_top_word_index = torch.topk(lda_word_prob_tensor, top_k, dim = 1, sorted=True)
+    top_word_emb = word_norm_emb[lda_top_word_index,:]
+    #top_word_emb should have size (lda_topic_num, top_k, emb_size)
+    top_word_emb_sum = torch.sum(top_word_emb * lda_top_word_value.unsqueeze(-1), dim = 1)
+    lda_fixed_topic_emb = top_word_emb_sum/ (0.000000000001 + top_word_emb_sum.norm(dim = -1, keepdim=True) )
+    #lda_top_word_value, lda_top_word_index, lda_fixed_topic_emb = get_topic_emb(lda_fixed_topic_emb, word_norm_emb, top_k, batch_size, num_head)
+    
+    sim_pairwise = torch.matmul(word_norm_emb, lda_fixed_topic_emb.permute(1,0))
+    top_value, top_index = torch.topk(sim_pairwise, top_k, dim = 0, sorted=True)
+    # the index of each words in the vocab list
+    lda_top_word_index = top_index.permute(1,0)
+    # the value of each words
+    lda_top_word_value = top_value.permute(1,0)
+    
+    word_norm_emb_top = word_norm_emb[lda_top_word_index,:]
+    word_norm_emb_w_sum = torch.sum( word_norm_emb_top * lda_top_word_value.unsqueeze(-1), dim = 1)/ lda_top_word_value.unsqueeze(-1).sum(dim = 1)
+    lda_fixed_topic_emb = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
+        
+    return lda_word_prob_tensor, lda_top_word_value, lda_top_word_index, lda_fixed_topic_emb
+
     return top_value, top_index, word_w_sum_norm
 
 def load_lda_model(LDA_model_path, word_d2_idx, word_norm_emb, top_k):
@@ -826,6 +938,7 @@ def NSD_prediction(feature, inner_idx_tensor, future_mask, parallel_encoder, par
     word_w_sum_norm = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
     return top_value, top_index, word_w_sum_norm
 
+
 def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, stop_word_set, topic_models, de_en_connection, LDA_model_path, word_emb_center_path):
     top_k = 5
     emb_sum = torch.sum(word_norm_emb,dim=1)
@@ -866,6 +979,24 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
             feature, target_unfold, inner_idx_tensor, future_mask = sample_batched
             feature_text = [ [tokenizer_GPT2._convert_id_to_token(x) for x in feature[i,:].tolist()] for i in range(feature.size(0))]
             
+            batch_size, num_head = inner_idx_tensor.size()
+            inner_idx_tensor_np = inner_idx_tensor.cpu().numpy()
+            word_raw_org_list = []
+            for b, feature_text_i in enumerate(feature_text):
+                word_raw_org_list_i = []
+                for j in range(num_head):
+                    end_idx = inner_idx_tensor_np[b,j]
+                    word_raw_org_list_i.append( tokenizer_GPT2.convert_tokens_to_string(feature_text_i[:end_idx]) )
+                word_raw_org_list.append(word_raw_org_list_i)
+            #context = tokenizer_GPT2.decode(feature[i_sent,:end]).replace('â',"'").replace('\n'," ")
+            #if len(context.split()) < 50:
+            #    #outf.write("Skip {} sent {} head due to short context\n".format(i_sent, m))
+            #    continue
+            #try:
+            #    context.encode('ascii', 'strict')
+            #except:
+            #    #outf.write("Skip {} sent {} head due to special token\n".format(i_sent, m))
+            #    continue
             #tokenized_feature = [nlp(feature_text_i).text for feature_text_i in feature_text]
             #word_idx_d2_count = {}
             batch_size, num_head = inner_idx_tensor.size()
@@ -878,22 +1009,22 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
             
             if 'random_vocab' in  topic_models:
                 top_value, top_index, word_w_sum_norm = random_vocab_sampling(could_sample_list, word_norm_emb, batch_size, num_head, n_basis, top_k)
-                topic_result_stats.evaluate_topic_models("random_vocab", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("random_vocab", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('random_vocab') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
 
             if 'random_word' in topic_models:
                 top_value, top_index, word_w_sum_norm = random_word_sampling(word_idx_list, word_norm_emb, n_basis, top_k)
-                topic_result_stats.evaluate_topic_models("random_word", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("random_word", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('random_word') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
 
             if 'SC_cluster' in topic_models:
                 top_value, top_index, word_w_sum_norm = cluster_sampling(word_idx_list, word_norm_emb, n_basis, top_k, cluster_method="Sparse_coding")
-                topic_result_stats.evaluate_topic_models("SC_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("SC_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('SC_cluster') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'kmeans_cluster' in topic_models:
                 top_value, top_index, word_w_sum_norm = cluster_sampling(word_idx_list, word_norm_emb, n_basis, top_k, cluster_method="KMeans")
-                topic_result_stats.evaluate_topic_models("kmeans_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("kmeans_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('kmeans_cluster') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'LDA' in topic_models or 'global_centers' in topic_models:
@@ -901,17 +1032,17 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
 
             if 'LDA_org' in topic_models:
                 top_value, top_index, word_w_sum_norm = select_fixed_lda_topics(context_norm_emb, lda_top_word_value, lda_top_word_index, lda_fixed_topic_emb, n_basis)
-                topic_result_stats.evaluate_topic_models("LDA_org", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("LDA_org", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('LDA_org') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'LDA_plus' in topic_models:
                 top_value, top_index, word_w_sum_norm = select_dynamic_lda_topics(context_norm_emb, word_norm_emb, lda_word_prob_tensor, n_basis, top_k)
-                topic_result_stats.evaluate_topic_models("LDA_plus", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("LDA_plus", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('LDA_plus') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'global_centers' in topic_models:
                 top_value, top_index, word_w_sum_norm = select_fixed_lda_topics(context_norm_emb, w_emb_top_word_value, w_emb_top_word_index, word_norm_emb_centers, n_basis)
-                topic_result_stats.evaluate_topic_models("global_centers", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("global_centers", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('global_centers') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'NSD' in topic_models:
@@ -925,7 +1056,7 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
                 #word_norm_emb_top = word_norm_emb[top_index,:]
                 #word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2)/ top_value.unsqueeze(-1).sum(dim = 2)
                 #word_w_sum_norm = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
-                topic_result_stats.evaluate_topic_models("NSD", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("NSD", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_org_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('NSD') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
 
             print_basis_text(feature, idx2word_freq, top_value_arr, top_index_arr, method_name_arr, i_batch, outf, tokenizer_GPT2, inner_idx_tensor)
@@ -934,7 +1065,7 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
         topic_result_stats.generate_report(sys.stdout)
 
 
-def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path):
+def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, readable_context = False):
     top_k = 5
     nlp = English()
     word_d2_idx = {}
@@ -1028,11 +1159,6 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                     if end_int > max_prompt_len:
                         start_int = end_int - max_prompt_len
                     
-                    if topic_mode == 'no_condition':
-                        feature_expanded = feature[i_sent,start_int:end].unsqueeze(0).expand(num_sent_gen,end_int - start_int).to(device = device_conditional)
-                        output_org = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional)
-                        gen_sent_tensor[i_sent, m, :, :] = output_org
-                        continue
                     insert_loc_list.append(end_int - 1)
                     #num_selection = random.randint(1, n_basis)
                     num_selection = n_basis
@@ -1057,7 +1183,15 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                     #while( insert_loc_truncated[truncate_idx] < 0 ):
                     #    truncate_idx += 1
                     truncate_idx = -1
-                    output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional,)
+                    if topic_mode == 'no_condition':
+                        #feature_expanded = feature[i_sent,start_int:end].unsqueeze(0).expand(num_sent_gen,end_int - start_int).to(device = device_conditional)
+                        #output_org = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional)
+                        #truncate_idx = -1
+                        output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], [torch.zeros( (num_sent_gen,0,word_norm_emb.size(-1)),device = device_conditional) for x in range(insert_loc_truncated[truncate_idx:].size)], gen_sent_len, device_conditional,)
+                        #gen_sent_tensor[i_sent, m, :, :] = output_org
+                        #continue
+                    else:
+                        output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional,)
                     gen_sent_tensor[i_sent, m, :, :] = output
                     
                     #gen_text = tokenizer_GPT2.decode(output)
@@ -1076,7 +1210,7 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                     #gen_sent_tensor_org[i_sent, m, :, :] = output_org
                 #pplm_sent.append(temp)
             #print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, result_stats, csvOutf)
-            eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf)
+            eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf, readable_context)
             result_stats.renew_ngram()
             if i_batch + 1 >= max_batch_num:
                 break

@@ -77,7 +77,11 @@ device = torch.device("cuda" if args.cuda_topics else "cpu")
 
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device )
 #idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_val_shuffled, max_sent_len = load_corpus(args.data, args.batch_size, args.batch_size, device, skip_training = True, want_to_shuffle_val = False )
-idx2word_freq, dataloader_train_arr, dataloader_val = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = True )
+random_start = True
+#random_start = False
+#if args.topic_models == "NSD_vis":
+#    random_start = True
+idx2word_freq, dataloader_train_arr, dataloader_val = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, random_start = random_start )
 dataloader_train = dataloader_train_arr[0]
 
 utils_testing.compute_freq_prob_idx2word(idx2word_freq)
