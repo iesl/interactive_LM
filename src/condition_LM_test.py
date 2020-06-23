@@ -136,7 +136,7 @@ model_name = 'gpt2'
 encoder_state_dict = torch.load(os.path.join(args.checkpoint_conditional, 'encoder.pt'), map_location=device_conditional)
 gpt2_config = GPT2Config.from_pretrained(model_name)
 gpt2_config.word_emb_dim = output_emb_size
-model_condition = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).cuda(device_conditional)
+model_condition = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).to(device_conditional)
 print("model condition:", next(model_condition.parameters()).device)
 
 
@@ -149,7 +149,7 @@ pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, device = device_
 
 
 #load gpt-2 model for generating perplexity
-gpt2_model = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).cuda(device_gpt2)
+gpt2_model = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).to(device_gpt2)
 print("gpt-2:", next(gpt2_model.parameters()).device)
 
 
@@ -179,4 +179,6 @@ with open('gen_log/output.csv', 'w', encoding='utf-8') as csvOutf:
                 utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional, csvOutf, args.readable_context)
         else:
             outf.write('Testing Prompts:\n\n')
-            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path, args.readable_context)
+            csvOutf = writer(csvOutf)
+            csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic_0', 'topic_1', 'topic_2', 'topic_3', 'topic_4', 'topic_5', 'topic_6', 'topic_7', 'topic_8', 'topic_9', 'selected_topics', 'sentence', 'topic_mode'])
+            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path, csvOutf, args.readable_context)
