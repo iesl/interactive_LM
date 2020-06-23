@@ -29,6 +29,8 @@ parser.add_argument('--checkpoint_topics', type=str, default='./models/',
                     help='topical model checkpoint to use')
 parser.add_argument('--checkpoint_conditional', type=str, default='./models/',
                     help='conditional LM model checkpoint to use')
+parser.add_argument('--checkpoint_org', type=str, default='',
+                    help='original LM model checkpoint to use')
 parser.add_argument('--emb_file', type=str, default='target_emb.pt',
                     help='path to the file of a word embedding file')
 #parser.add_argument('--gpt2_vocab_file', type=str, default='./resources/distilgpt2-vocab.json',
@@ -64,10 +66,12 @@ parser.add_argument('--topic_mode', type=str, default='NSD',
                     help='topical model we want to use. Could be NSD, radnom_word, cluster, LDA')
 parser.add_argument('--LDA_model_path', type=str, default='',
                     help='path to the file of a LDA mdoel')
+parser.add_argument('--word_emb_center_path', type=str, default='',
+                    help='path to the file of a clustering results in a word embedding space')
 parser.add_argument('--stop_word_file', type=str, default='./resources/stop_word_list',
                     help='path to the file of a stop word list')
-parser.add_argument('--readable_context', type=str2bool, nargs='?', default=True,
-#parser.add_argument('--readable_context', type=str2bool, nargs='?', default=False,
+#parser.add_argument('--readable_context', type=str2bool, nargs='?', default=True,
+parser.add_argument('--readable_context', type=str2bool, nargs='?', default=False,
                     help='use CUDA for conditional LM')
 
 utils_testing.add_model_arguments(parser)
@@ -104,6 +108,7 @@ random_start = True
 #if args.topic_mode == "NSD":
 #    random_start = True
 idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device_topics, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, load_testing = True, random_start = random_start )
+#idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device_topics, args.tensor_folder, skip_training = True, want_to_shuffle_val = False, load_testing = True, random_start = random_start )
 dataloader_train = dataloader_train_arr[0]
 
 #if args.topic_mode != 'NSD':
@@ -153,6 +158,12 @@ gpt2_model = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_st
 print("gpt-2:", next(gpt2_model.parameters()).device)
 
 
+model_org = None
+if len(args.checkpoint_org) > 0:
+    device_org = torch.device("cuda:1" if args.cuda_conditional else "cpu")
+    encoder_state_dict = torch.load(os.path.join(args.checkpoint_org, 'encoder.pt'), map_location=device_org)
+    model_org = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).cuda(device_conditional)
+    print("gpt-2 finetued on wikipedia:", next(model_org.parameters()).device)
 
 
 #with open(args.gpt2_vocab_file) as f_in:
@@ -171,12 +182,12 @@ with open('gen_log/output.csv', 'w', encoding='utf-8') as csvOutf:
             csvOutf = writer(csvOutf)
             csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic_0', 'topic_1', 'topic_2', 'topic_3', 'topic_4', 'topic_5', 'topic_6', 'topic_7', 'topic_8', 'topic_9', 'selected_topics', 'sentence', 'model'])
             #csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic_0', 'topic_1', 'topic_2', 'topic_3', 'topic_4', 'topic_5', 'topic_6', 'topic_7', 'topic_8', 'topic_9', 'selected topics', 'sentence', 'model'])
-            utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, stop_word_set, args.bptt_conditional, csvOutf, args.readable_context)
+            utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, stop_word_set, args.bptt_conditional, csvOutf, model_org, args.readable_context)
             #outf.write('Validation Prompts:\n\n')
             #utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional)
             if dataloader_train:
                 outf.write('Training Prompts:\n\n')
-                utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional, csvOutf, args.readable_context)
+                utils_testing.visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, dataloader_train, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, args.de_en_connection, tokenizer_GPT2, args.bptt_conditional, csvOutf, model_org, args.readable_context)
         else:
             outf.write('Testing Prompts:\n\n')
-            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path, args.readable_context)
+            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path, args.readable_context)

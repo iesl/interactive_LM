@@ -486,7 +486,7 @@ def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_
     return output
 
 
-def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, stop_word_set, bptt_conditional, csvOutf, readable_context = False):
+def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, de_en_connection, tokenizer_GPT2, stop_word_set, bptt_conditional, csvOutf, model_org, readable_context = False):
     top_k = 5
     nlp = English()
     word_d2_idx = {}
@@ -551,11 +551,12 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     last_end = end
                     
                     context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
-                    context_proc, bad_context = preprocessing_context(context, outf)
-                    if bad_context:
-                        gen_text = ['']*num_sent_gen   
-                        temp.append(gen_text)
-                        continue
+                    if readable_context:
+                        context_proc, bad_context = preprocessing_context(context, outf)
+                        if bad_context:
+                            gen_text = ['']*num_sent_gen   
+                            temp.append(gen_text)
+                            continue
 
                     #if len(context.split()) < 50:
                     #    gen_text = ['']*num_sent_gen   
@@ -600,8 +601,10 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     gen_sent_tensor[i_sent, m, :, :] = output
                     
                     t = time.time()
-                    output_org = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], [torch.zeros( (num_sent_gen,0,word_norm_emb.size(-1)),device = device_conditional) for x in range(insert_loc_truncated[truncate_idx:].size)], gen_sent_len, device_conditional,)
-                    #output_org = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional,)
+                    if model_org is None:
+                        output_org = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], [torch.zeros( (num_sent_gen,0,word_norm_emb.size(-1)),device = device_conditional) for x in range(insert_loc_truncated[truncate_idx:].size)], gen_sent_len, device_conditional,)
+                    else:
+                        output_org = sample_seq(model_org, feature_expanded, None, None, gen_sent_len, device_conditional,)
                     org_elapsed = time.time() - t
                     gen_sent_tensor_org[i_sent, m, :, :] = output_org
                     
@@ -1065,7 +1068,7 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
         topic_result_stats.generate_report(sys.stdout)
 
 
-def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, readable_context = False):
+def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, word_emb_center_path, readable_context = False):
     top_k = 5
     nlp = English()
     word_d2_idx = {}
@@ -1082,6 +1085,12 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
         could_sample_list = list(  set(list(range(len(idx2word_freq)))) - (OOV_set | stop_word_set) )
     if 'LDA' in topic_mode:
         lda_word_prob_tensor, lda_top_word_value, lda_top_word_index, lda_fixed_topic_emb = load_lda_model(LDA_model_path, word_d2_idx, word_norm_emb, top_k)
+    if 'global_centers' in topic_mode:
+        word_emb_centers = np.loadtxt(word_emb_center_path)
+        word_emb_centers = torch.tensor(word_emb_centers, dtype=torch.float, device = word_norm_emb.device)
+        word_norm_emb_centers = word_emb_centers / (0.000000000001 + word_emb_centers.norm(dim = -1, keepdim=True) )
+        sim_pairwise = torch.mm(word_norm_emb_centers, word_norm_emb.permute(1,0))
+        w_emb_top_word_value, w_emb_top_word_index = torch.topk(sim_pairwise, top_k, dim = 1, sorted=True)
     
     with torch.no_grad():
         result_stats = result_statistics(gpt2_model)
@@ -1109,7 +1118,7 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
             if topic_mode == 'random_vocab':
                 top_value, top_index, word_w_sum_norm = random_vocab_sampling(could_sample_list, word_norm_emb, batch_size, num_head, n_basis, top_k)
             
-            elif topic_mode == 'random_word' or topic_mode == 'no_condition':
+            elif topic_mode == 'random_word' or topic_mode == 'no_condition' or topic_mode == 'no_condition_org':
                 top_value, top_index, word_w_sum_norm = random_word_sampling(word_idx_list, word_norm_emb, n_basis, top_k)
             
             elif topic_mode == 'SC_cluster':
@@ -1123,6 +1132,8 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
             
             elif topic_mode == 'NSD_topic':
                 top_value, top_index, word_w_sum_norm = NSD_prediction(feature, inner_idx_tensor, future_mask, parallel_encoder, parallel_decoder, word_norm_emb, n_basis, top_k, de_en_connection, batch_size, num_head)
+            elif topic_mode == 'global_centers':
+                top_value, top_index, word_w_sum_norm = select_fixed_lda_topics(context_norm_emb, w_emb_top_word_value, w_emb_top_word_index, word_norm_emb_centers, n_basis)
             #elif topic_mode == 'no_condition':
             #    word_w_sum_norm = torch.zeros(0)
             #basis_norm_pred, top_value, top_index = predict_batch(feature, inner_idx_tensor, future_mask, parallel_encoder, parallel_decoder, word_norm_emb, n_basis, top_k, de_en_connection)
@@ -1190,6 +1201,8 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                         output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], [torch.zeros( (num_sent_gen,0,word_norm_emb.size(-1)),device = device_conditional) for x in range(insert_loc_truncated[truncate_idx:].size)], gen_sent_len, device_conditional,)
                         #gen_sent_tensor[i_sent, m, :, :] = output_org
                         #continue
+                    elif topic_mode == 'no_condition_org':
+                        output = sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional,)
                     else:
                         output = sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional,)
                     gen_sent_tensor[i_sent, m, :, :] = output
