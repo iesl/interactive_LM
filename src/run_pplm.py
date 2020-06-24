@@ -35,7 +35,7 @@ from torch.autograd import Variable
 from tqdm import trange
 
 from pplm_classification_head import ClassificationHead
-from transformers import GPT2Tokenizer
+from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
 from transformers.file_utils import cached_path
 from transformers.modeling_gpt2 import GPT2LMHeadModel
 

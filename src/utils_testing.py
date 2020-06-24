@@ -1,6 +1,7 @@
 import spacy
 import torch
 from spacy.lang.en import English
+from csv import writer
 #import nsd_loss
 import numpy as np
 #from scipy.spatial import distance
@@ -282,6 +283,10 @@ def preprocessing_context(context, outf = None):
         if outf is not None:
             outf.write("Skip due to short context\n")
         bad_context = True
+    if len(context.split()) > 250:
+        if outf is not None:
+            outf.write("Skip due to long context\n")
+        bad_context = True
     try:
         context.encode('ascii', 'strict')
     except:
@@ -290,13 +295,14 @@ def preprocessing_context(context, outf = None):
         bad_context = True
     return context, bad_context
 
-def eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf, readable_context):
+def eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf, csvOutf, readable_context, topic_mode):
     batch_size, num_head, top_k, n_basis = top_index.size()
     num_sent_gen = gen_sent_tensor.size(2)
+    #for i_sent in range(1):
     for i_sent in range(batch_size):
         #outf.write('batch number: ' + str(i_sent) + '\n')
         last_end = -1
-        # for m in range(1):
+        #for m in range(3):
         for m in range(num_head):
             #outf.write('number of head: ' + str(m) + '\n')
             end = inner_idx_tensor[i_sent,m].item()
@@ -310,7 +316,45 @@ def eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_in
                 if bad_context:
                     continue
             outf.write(context+'\n')
+
+            topics = dict()
+            for j in range(n_basis):
+                outf.write( str(j) + ', ' )
+                topics[j] = {}
+                topics[j]["name"] = str(j) 
+                topics[j]["keywords"] = []
+                topics[j]["weights"] = []
+                for k in range(top_k):
+                    word_nn = idx2word_freq[top_index[i_sent,m,k,j].item()][0]
+                    topics[j]["keywords"].append(word_nn)
+                    topics[j]["weights"].append(' {:5.3f}'.format(top_value[i_sent,m,k,j].item()))
             selected_topic_idx = selected_topic_idx_arr[i_sent][m]
+
+            prev, last = saparateParagraph(context)
+            selected_topics= ' | '.join([generateString(topics[x]) for x in selected_topic_idx])
+
+            # if len(pplm_sent[i_sent][m][0]) == 0:
+            #     outf.write('Skipping this context because PPLM cannot condition on any word.\n')
+            #     continue
+
+            sent_list = []
+            for j in range(num_sent_gen):
+                generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
+                sent_list.append(generated_sent)
+
+            # cond_sent_list_out, org_sent_list_out, pplm_sent_list_out, excluding_j_set, num_not_ascii = filter_generated_sents(cond_sent_list, org_sent_list, pplm_sent[i_sent][m])
+            # not_ascii_conditional += num_not_ascii[0]
+            # not_ascii_org += num_not_ascii[1] 
+            # not_ascii_PPLM += num_not_ascii[2]
+
+            for j in range(num_sent_gen):
+                # if j in excluding_j_set:
+                #     continue
+                csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, sent_list[j], topic_mode])
+                # if gen_sent_tensor_org.size(0) > 0:
+                #     csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, org_sent_list_out[j], 'Original '+ str(j)])
+                # csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, pplm_sent_list_out[j], 'PPLM '+ str(j)])
+
             for j in range(num_sent_gen):
                 #generated_sent = cond_sent_list[j]
                 #generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
@@ -612,7 +656,10 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     t = time.time()
                     #context = tokenizer_GPT2.convert_tokens_to_string(feature_text[i_sent][:end])
                     try:
-                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True)
+                        top_k_sampling = 40
+                        #gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True) #original
+                        #gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.03, 1.0, top_k_sampling, True, 3, 10000, 1, 5, False, 1.5, 0.99, 0.01, True) #default
+                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.03, 1.0, top_k_sampling, True, 3, 10000, 1, 5, False, 1.5, 0.9, 0.01, True)
                     except:
                         print("Skipping {} batch, {} paragraph, and {} head because PPLM cannot condition on any word".format(i_batch,i_sent,m))
                         gen_text = ['']*num_sent_gen
@@ -1068,7 +1115,7 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
         topic_result_stats.generate_report(sys.stdout)
 
 
-def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, word_emb_center_path, readable_context = False):
+def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, word_emb_center_path, csvOutf, readable_context = False):
     top_k = 5
     nlp = English()
     word_d2_idx = {}
@@ -1145,7 +1192,7 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
             selected_topic_idx_arr =[ [[] for j in range(num_head)] for i in range(batch_size)]
             pplm_sent = []
 
-            # for i_sent in range(1):
+            #for i_sent in range(1):
             for i_sent in range(batch_size):
                 print("sent"+str(i_sent))
                 #if i_sent == 0:
@@ -1154,7 +1201,7 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                 future_emb_chosen_arr = []
                 last_end = -1
                 #temp = []
-                # for m in range(1):
+                #for m in range(3):
                 for m in range(num_head):
                     print("head"+str(m))
                     #if m <4:
@@ -1223,7 +1270,7 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
                     #gen_sent_tensor_org[i_sent, m, :, :] = output_org
                 #pplm_sent.append(temp)
             #print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, top_index, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, gen_sent_tensor_org, selected_topic_idx_arr, result_stats, csvOutf)
-            eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf, readable_context)
+            eval_basis_conditional_text_single(feature, idx2word_freq, top_value, top_index, tokenizer_GPT2, inner_idx_tensor, gen_sent_tensor, selected_topic_idx_arr, result_stats, word_raw_list, word_raw_rest_list, outf, csvOutf, readable_context, topic_mode)
             result_stats.renew_ngram()
             if i_batch + 1 >= max_batch_num:
                 break
