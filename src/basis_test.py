@@ -51,6 +51,8 @@ parser.add_argument('--LDA_model_path', type=str, default='',
                     help='path to the file of a LDA mdoel')
 parser.add_argument('--word_emb_center_path', type=str, default='',
                     help='path to the file of a clustering results in a word embedding space')
+parser.add_argument('--readable_context', type=str2bool, nargs='?', default=False,
+                    help='use CUDA for conditional LM')
 
 utils_testing.add_model_arguments(parser)
 
@@ -81,7 +83,9 @@ random_start = True
 #random_start = False
 #if args.topic_models == "NSD_vis":
 #    random_start = True
-idx2word_freq, dataloader_train_arr, dataloader_val = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, random_start = random_start )
+#idx2word_freq, dataloader_train_arr, dataloader_val = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, random_start = random_start )
+idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = True, load_testing = True, random_start = random_start )
+#idx2word_freq, dataloader_train_arr, dataloader_val, dataloader_test = load_corpus(args.data, args.batch_size, args.batch_size, args.bptt, -1, args.dilated_head_span, device, args.tensor_folder, skip_training = True, want_to_shuffle_val = False, load_testing = True, random_start = random_start )
 dataloader_train = dataloader_train_arr[0]
 
 utils_testing.compute_freq_prob_idx2word(idx2word_freq)
@@ -128,4 +132,5 @@ with open(args.outf, 'w') as outf:
     #test_batch_size = 1
     #test_data = batchify(corpus.test, test_batch_size, args)
     else:
-        utils_testing.testing_all_topic_baselines(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, stop_word_set, args.topic_models, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path)
+        #utils_testing.testing_all_topic_baselines(dataloader_val, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, stop_word_set, args.topic_models, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path)
+        utils_testing.testing_all_topic_baselines(dataloader_test, parallel_encoder, parallel_decoder, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, stop_word_set, args.topic_models, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path, args.readable_context)

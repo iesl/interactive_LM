@@ -21,6 +21,7 @@ class topic_result_statistics:
         self.model_results[model_name]["novelty_word_w"] = 0
         self.model_results[model_name]["relevancy_f_25"] = 0
         self.model_results[model_name]["relevancy_f_25_arr"] = []
+        self.model_results[model_name]["context_len_arr_no_stop"] = []
         self.model_results[model_name]["context_len_arr"] = []
         self.model_results[model_name]["relevancy_f_25_w"] = 0
         self.model_results[model_name]["relevancy_topic_f_25"] = 0
@@ -31,7 +32,8 @@ class topic_result_statistics:
         self.model_results[model_name]["relevancy_f_all_count"] = 0
 
     
-    def evaluate_topic_models(self, model_name, top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb):
+    #def evaluate_topic_models(self, model_name, top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb):
+    def evaluate_topic_models(self, model_name, top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb):
         def _emb_var(topic_embedding):
             n_basis = topic_embedding.size(0)
             topic_embedding_mean = topic_embedding.mean(dim = 0, keepdim = True)
@@ -104,10 +106,12 @@ class topic_result_statistics:
                     while j >= len(self.model_results[model_name]['relevancy_f_25_count_arr']):
                         self.model_results[model_name]['relevancy_f_25_count_arr'].append(0)
                         self.model_results[model_name]['relevancy_f_25_arr'].append(0)
+                        self.model_results[model_name]['context_len_arr_no_stop'].append(0)
                         self.model_results[model_name]['context_len_arr'].append(0)
                     self.model_results[model_name]['relevancy_f_25_arr'][j] += topic_future_word_sim_max_word[:future_window_size].mean().item()
                     self.model_results[model_name]['relevancy_f_25_count_arr'][j] += 1
-                    self.model_results[model_name]['context_len_arr'][j] += len(word_index_context[:-1])
+                    self.model_results[model_name]['context_len_arr_no_stop'][j] += len(word_index_context[:-1])
+                    self.model_results[model_name]['context_len_arr'][j] += len(word_full_list[i][j][:-1])
 
                     self.model_results[model_name]['relevancy_f_25_count_w'] += 1
                     self.model_results[model_name]['relevancy_f_25_w'] += ( (topic_future_word_sim_max_word[:future_window_size]*word_weight_future[:future_window_size] ).sum() / word_weight_future[:future_window_size].sum() ).item()
@@ -133,6 +137,8 @@ class topic_result_statistics:
             outf.write(model_name + " relevancy_f_25_arr: "+ str( [model["relevancy_f_25_arr"][x] / model["relevancy_f_25_count_arr"][x] if model["relevancy_f_25_count_arr"][x] >0 else 0 for x in range(len(model["relevancy_f_25_count_arr"]))] ) + '\n')
             outf.write(model_name + " context_len_arr: "+ str( [model["context_len_arr"][x] / model["relevancy_f_25_count_arr"][x] if model["relevancy_f_25_count_arr"][x] >0 else 0 for x in range(len(model["relevancy_f_25_count_arr"]))] ) + '\n')
             outf.write(model_name + " context_len_all: "+ str( sum(model["context_len_arr"]) / float(sum(model["relevancy_f_25_count_arr"])) ) + '\n')
+            outf.write(model_name + " context_len_arr_no_stop: "+ str( [model["context_len_arr_no_stop"][x] / model["relevancy_f_25_count_arr"][x] if model["relevancy_f_25_count_arr"][x] >0 else 0 for x in range(len(model["relevancy_f_25_count_arr"]))] ) + '\n')
+            outf.write(model_name + " context_len_all_no_stop: "+ str( sum(model["context_len_arr_no_stop"]) / float(sum(model["relevancy_f_25_count_arr"])) ) + '\n')
             outf.write(model_name + " relevancy_f_25_w: "+ str( model["relevancy_f_25_w"] / model["relevancy_f_25_count_w"]) + '\n')
             outf.write(model_name + " relevancy_topic_f_25: "+ str( model["relevancy_topic_f_25"] / model["relevancy_f_25_count"]) + '\n')
             outf.write(model_name + " relevancy_f_all: "+ str( model["relevancy_f_all"] / model["relevancy_f_all_count"]) + '\n')

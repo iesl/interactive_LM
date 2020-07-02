@@ -167,6 +167,7 @@ class Seq2PairDataset(torch.utils.data.Dataset):
         if self.random_start:
             init_head_posi = random.randint(1, self.dilated_head_span - 1)
         else:
+            #init_head_posi = 20
             init_head_posi = int( self.dilated_head_span / 2 )
         inner_idx_tensor = torch.empty(self.head_num, dtype = torch.long, device = self.output_device)
         future_mask = torch.zeros( (self.head_num, self.seq_len), dtype = torch.float, device = self.output_device)

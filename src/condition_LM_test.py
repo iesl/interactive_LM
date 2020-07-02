@@ -37,6 +37,8 @@ parser.add_argument('--emb_file', type=str, default='target_emb.pt',
 #                    help='path to the file of a word embedding file')
 parser.add_argument('--outf', type=str, default='gen_log/generated.txt',
                     help='output file for generated text')
+parser.add_argument('--csv_outf', type=str, default='gen_log/output.csv',
+                    help='output file for generated text')
 
 ###system
 parser.add_argument('--seed', type=int, default=1111,
@@ -154,7 +156,8 @@ pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, device = device_
 
 
 #load gpt-2 model for generating perplexity
-gpt2_model = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).to(device_gpt2)
+#gpt2_model = GPT2LMHeadModel.from_pretrained(model_name, state_dict = encoder_state_dict, config = gpt2_config).to(device_gpt2)
+gpt2_model = GPT2LM.from_pretrained('gpt2-medium').to(device_gpt2)
 print("gpt-2:", next(gpt2_model.parameters()).device)
 
 
@@ -175,7 +178,7 @@ decoder.eval()
 model_condition.eval()
 gpt2_model.eval()
 
-with open('gen_log/output.csv', 'w', encoding='utf-8') as csvOutf:
+with open(args.csv_outf, 'w', encoding='utf-8') as csvOutf:
     with open(args.outf, 'w') as outf:
         if args.topic_mode == 'NSD':
             outf.write('Testing Prompts:\n\n')
