@@ -265,7 +265,7 @@ def train_one_epoch(dataloader_train, external_emb, lr, split_i):
         #    dilated_heads_posi.append(len(feature)-1)
         feature, future_toks, idx_gpt2_to_spacy_small = sample_batched
         if args.turn_off_condition:
-            outputs = encoder(feature, labels=feature)
+            outputs = parallel_encoder(feature, labels=feature)
             loss = outputs[0]
         else:
             #insert_loc = random.sample( range(args.bptt - args.min_rest_seq_len), args.num_insert) #without replacement
@@ -300,7 +300,7 @@ def train_one_epoch(dataloader_train, external_emb, lr, split_i):
                 #    future_toks_merge_emb = torch.cat( (future_toks_chosen_emb[:,merge_num:,:], future_toks_topk_sum_norm_emb), dim = 1)
                 #    future_toks_merge_perm_emb = future_toks_merge_emb[:, torch.randperm(chosen_topic_num[j].item(),device=device),:]
                 #    future_emb_chosen_arr.append( future_toks_merge_perm_emb )
-            outputs = encoder(feature, labels=feature, insert_loc=insert_loc, future_emb_chosen_arr=future_emb_chosen_arr)
+            outputs = parallel_encoder(feature, labels=feature, insert_loc=insert_loc, future_emb_chosen_arr=future_emb_chosen_arr)
             loss = outputs[0]
         #feature.size(0) % args.dilated_head_span
         #target_idx = idx_feature_to_target[:,init_head_posi:].unfold(dim=1, args.n_further, args.dilated_head_span)

@@ -84,6 +84,8 @@ class Dictionary(object):
             self.ind_l2_w_freq[i][2] = str(self.ind_l2_w_freq[i][2])
             f_out.write('\t'.join(self.ind_l2_w_freq[i])+'\n')
 
+
+
 class Condition_Seq2PairDataset(torch.utils.data.Dataset):
 #will need to handle the partial data loading if the dataset size is larger than cpu memory
     def __init__(self, w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor, bptt, n_further, dilated_head_span_no_use, random_start_no_use, device):
@@ -145,6 +147,29 @@ class Condition_Seq2PairDataset(torch.utils.data.Dataset):
         #return [feature, target_unfold, inner_idx_tensor, future_mask]
         return [feature, target_small, idx_gpt2_to_spacy_small]
 
+class raw_sent_dataset(torch.utils.data.Dataset):
+    def __init__(self, sent_list, type_idx_list, tokenizer_GPT2, bptt, device):
+        self.sent_list = sent_list
+        self.tokenizer_GPT2 = tokenizer_GPT2
+        self.type_idx_list = type_idx_list
+        self.bptt = bptt
+        self.device = device
+
+    def __len__(self):
+        return len(self.sent_list)
+
+    def __getitem__(self, idx):
+        sent = self.sent_list[idx]
+        sent_idx_arr = self.tokenizer_GPT2.encode(sent)
+        sent_len = len(sent_idx_arr)
+        start_idx = sent_len - self.bptt
+        if start_idx > 0:
+            sent_idx_arr = sent_idx_arr[start_idx:]
+            sent_len = self.bptt
+        feature = torch.zeros( self.bptt, dtype = torch.long, device = self.device)
+        feature[:sent_len] = torch.tensor(sent_idx_arr, dtype = torch.long, device = self.device)
+        inner_idx_tensor = torch.tensor(sent_len, dtype = torch.long, device = self.device)
+        return feature, inner_idx_tensor, self.type_idx_list[idx]
 
 class Seq2PairDataset(torch.utils.data.Dataset):
 #will need to handle the partial data loading if the dataset size is larger than cpu memory
@@ -233,7 +258,7 @@ def create_data_loader_split(f_in, bsz, bptt, n_further, dilated_head_span, devi
     w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor = torch.load(f_in, map_location='cpu')
     #print(w_ind_gpt2_tensor.size(), w_ind_spacy_tensor.size(), idx_gpt2_to_spacy_tensor.size())
     training_size = w_ind_gpt2_tensor.size(0)
-    idx_arr = np.random.permutation(training_size)
+    #idx_arr = np.random.permutation(training_size)
     split_size = int(training_size / split_num)
     dataset_arr = []
     for i in range(split_num):
@@ -248,20 +273,20 @@ def create_data_loader_split(f_in, bsz, bptt, n_further, dilated_head_span, devi
         dataset_arr.append(  dataset_class(w_ind_gpt2_tensor[start:end],w_ind_spacy_tensor[start_idx_spacy:end_idx_spacy], idx_gpt2_to_spacy_tensor[start:end]-start_idx_spacy, bptt, n_further, dilated_head_span, random_start, device ) ) #assume that the dataset are randomly shuffled beforehand
 
     use_cuda = False
-    if device.type == 'cude':
+    if device.type == 'cuda':
         use_cuda = True
     #dataloader_arr = [torch.utils.data.DataLoader(dataset_arr[i], batch_size = bsz, shuffle = True, pin_memory=use_cuda, drop_last=False) for i in range(split_num)]
-    dataloader_arr = [torch.utils.data.DataLoader(dataset_arr[i], batch_size = bsz, shuffle = True, pin_memory=use_cuda, drop_last=True) for i in range(split_num)]
+    dataloader_arr = [torch.utils.data.DataLoader(dataset_arr[i], batch_size = bsz, shuffle = True, pin_memory=not use_cuda, drop_last=True) for i in range(split_num)]
     return dataloader_arr
 
 def create_data_loader(f_in, bsz, bptt, n_further, dilated_head_span, device, dataset_class, want_to_shuffle = True, random_start=True):
     w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor = torch.load(f_in, map_location='cpu')
     dataset = dataset_class(w_ind_gpt2_tensor, w_ind_spacy_tensor, idx_gpt2_to_spacy_tensor, bptt, n_further, dilated_head_span, random_start, device)
     use_cuda = False
-    if device.type == 'cude':
+    if device.type == 'cuda':
         use_cuda = True
     #return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=use_cuda, drop_last=False)
-    return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=use_cuda, drop_last=True)
+    return torch.utils.data.DataLoader(dataset, batch_size = bsz, shuffle = want_to_shuffle, pin_memory=not use_cuda, drop_last=True)
 
 
 def load_corpus(data_path, train_bsz, eval_bsz, bptt, n_further, dilated_head_span, device, tensor_folder = "tensors", split_num = 1, skip_training = False, want_to_shuffle_val = False, condition = False, load_testing = False, random_start = True):
