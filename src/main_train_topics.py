@@ -64,6 +64,8 @@ parser.add_argument('--coeff_opt_algo', type=str, default='rmsprop',
                     help='Could be sgd_bmm, sgd, asgd, adagrad, rmsprop, and adam')
 parser.add_argument('--training_split_num', type=int, default=2,
                     help='We want to split training corpus into how many subsets. Splitting training dataset seems to make pytorch run much faster and we can store and eval the model more frequently')
+parser.add_argument('--start_training_split', type=int, default=0,
+                    help='We want to split training corpus into how many subsets. Splitting training dataset seems to make pytorch run much faster and we can store and eval the model more frequently')
 parser.add_argument('--valid_per_epoch', type=int, default=2,
                     help='Number of times we want to run through validation data and save model within an epoch')
 #parser.add_argument('--dropout', type=float, default=0.4,
@@ -160,7 +162,7 @@ else:
 
 if not args.continue_train:
     args.save = '{}-{}'.format(args.save, time.strftime("%Y%m%d-%H%M%S"))
-    create_exp_dir(args.save, scripts_to_save=['./src/main_train_topics.py', './src/model.py', './src/nsd_loss.py'])
+create_exp_dir(args.save, scripts_to_save=['./src/main_train_topics.py', './src/model.py', './src/nsd_loss.py'])
 
 
 def logging(s, print_=True, log_=True):
@@ -216,18 +218,23 @@ w_freq = counter_to_tensor(idx2word_freq,device)
 
 model_name = 'distilgpt2'
 
-encoder = GPT2Model.from_pretrained(model_name)
+ntokens = len(idx2word_freq)
 gpt2_config = GPT2Config.from_pretrained(model_name)
 
-ntokens = len(idx2word_freq)
+decoder = model_code.EMB2SEQ(args.de_model.split('+'), gpt2_config.n_embd, args.nhidlast2, output_emb_size, 1, args.n_basis, positional_option = args.positional_option, dropoutp= args.dropoutp, trans_layers = args.trans_layers, using_memory =  args.de_en_connection, dropout_prob_trans = args.dropout_prob_trans)
+
+if not args.continue_train:
+    encoder = GPT2Model.from_pretrained(model_name)
+else:
+    encoder_state_dict = torch.load(os.path.join(args.save, 'encoder.pt'), map_location=device)
+    encoder = GPT2Model.from_pretrained(model_name, state_dict = encoder_state_dict)
+    decoder.load_state_dict(torch.load(os.path.join(args.save, 'decoder.pt'), map_location=device))
 
 #model_further = torch.tensor(0.)
 #model_further = model_code.RNNModel_further(args.model, args.nhidlast, args.nhidlast2, args.emsize, 1, args.n_basis, 0, 0)
 
 #model.config_class.n_embd
 #print(model.config_class.__dict__)
-decoder = model_code.EMB2SEQ(args.de_model.split('+'), gpt2_config.n_embd, args.nhidlast2, output_emb_size, 1, args.n_basis, positional_option = args.positional_option, dropoutp= args.dropoutp, trans_layers = args.trans_layers, using_memory =  args.de_en_connection, dropout_prob_trans = args.dropout_prob_trans)
-
 #if args.continue_train:
 #    #model = torch.load(os.path.join(args.save, 'model.pt'))
 #    model.load_state_dict(torch.load(os.path.join(args.save, 'model.pt')))
@@ -439,6 +446,12 @@ else:
     optimizer_e = torch.optim.Adam(encoder.parameters(), lr=args.lr, weight_decay=args.wdecay)
     optimizer_d = torch.optim.Adam(decoder.parameters(), lr=args.lr, weight_decay=args.wdecay)
 
+if args.continue_train:
+    optimizer_e_state_dict = torch.load(os.path.join(args.save, 'optimizer_e.pt'), map_location=device)
+    optimizer_e.load_state_dict(optimizer_e_state_dict)
+    optimizer_d_state_dict = torch.load(os.path.join(args.save, 'optimizer_d.pt'), map_location=device)
+    optimizer_d.load_state_dict(optimizer_d_state_dict)
+
 lr = args.lr
 best_val_loss = None
 nonmono_count = 0
@@ -447,6 +460,9 @@ saving_freq = int(math.floor(args.training_split_num / args.valid_per_epoch))
 for epoch in range(1, args.epochs+1):
     epoch_start_time = time.time()
     for i in range(len(dataloader_train_arr)):
+        if epoch == 1 and i < args.start_training_split:
+            print("Skipping epoch "+str(epoch) + ' split '+str(i) )
+            continue
         current_coeff_opt = train_one_epoch(dataloader_train_arr[i], external_emb, lr, current_coeff_opt, i)
         
         if i != args.training_split_num - 1 and (i + 1) % saving_freq != 0:

@@ -487,6 +487,7 @@ def top_k_logits(logits, k):
     return torch.where(logits < min_values, torch.ones_like(logits, dtype=logits.dtype) * -1e10, logits)
 
 def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_sent_len, device, temperature=1, top_k = 40, sample=True):
+#def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_sent_len, device, temperature=1, top_k = 5, sample=True):
     #modified from https://github.com/graykode/gpt-2-Pytorch/blob/master/GPT2/sample.py
     prev = context
     batch_size = prev.size(0)
@@ -658,8 +659,8 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
                     try:
                         top_k_sampling = 40
                         #gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.05, 1.0, top_k, True, 1, 10000, 1, 0, False, 1.5, 0.9, 0.01, True) #original
-                        #gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.03, 1.0, top_k_sampling, True, 3, 10000, 1, 5, False, 1.5, 0.99, 0.01, True) #default
-                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.03, 1.0, top_k_sampling, True, 3, 10000, 1, 5, False, 1.5, 0.9, 0.01, True)
+                        gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.03, 1.0, top_k_sampling, True, 3, 10000, 1, 5, False, 1.5, 0.99, 0.01, True) #default
+                        #gen_text, _ = pplm_model.run_pplm_example(context, False, num_sent_gen, bag_of_words, gen_sent_len, 0.03, 1.0, top_k_sampling, True, 1, 10000, 1, 5, False, 1.5, 0.9, 0.01, True)
                     except:
                         print("Skipping {} batch, {} paragraph, and {} head because PPLM cannot condition on any word".format(i_batch,i_sent,m))
                         gen_text = ['']*num_sent_gen
