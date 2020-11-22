@@ -10,7 +10,7 @@ cluster_num = 1000
 
 emb_file = '/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/resources/glove.840B.300d_filtered_wiki2016_min100.txt'
 dictionary_input_name = './data/processed/wiki2016_gpt2/dictionary_index'
-output_file = '/iesl/canvas/hschang/language_modeling/interactive_LM/models/GloVe_clustering/center_emb_n'+str(cluster_num)
+output_file = '/iesl/canvas/hschang/language_modeling/interactive_LM/models/GloVe_clustering/normalized_center_emb_n'+str(cluster_num)
 
 
 def load_emb_file_to_np(emb_file, idx2word_freq):
@@ -41,6 +41,8 @@ with open(dictionary_input_name) as f_in:
     idx2word_freq = utils.load_idx2word_freq(f_in)
 
 external_emb, emb_size, oov_list = load_emb_file_to_np(emb_file, idx2word_freq)
+external_emb = external_emb / (0.000000000001 + np.linalg.norm(external_emb,axis = 1, keepdims=True))
+
 kmeans_model = KMeans(n_clusters=cluster_num, n_init=1, random_state=0, init='random', max_iter = 1000)
 
 kmeans_model.fit(external_emb)
