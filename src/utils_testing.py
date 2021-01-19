@@ -522,6 +522,7 @@ def top_k_logits(logits, k):
     return torch.where(logits < min_values, torch.ones_like(logits, dtype=logits.dtype) * -1e10, logits)
 
 def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_sent_len, device, temperature=1, top_k = 40, sample=True):
+#def sample_seq(model_condition, context, insert_loc, future_emb_chosen_arr, gen_sent_len, device, temperature=1, top_k = 5, sample=True):
     #modified from https://github.com/graykode/gpt-2-Pytorch/blob/master/GPT2/sample.py
     prev = context
     batch_size = prev.size(0)
