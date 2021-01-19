@@ -619,7 +619,8 @@ def visualize_interactive_LM(model_condition, pplm_model, gpt2_model, device_con
             selected_topic_idx_arr =[ [[] for j in range(num_head)] for i in range(batch_size)]
             pplm_sent = []
 
-            word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
+            #word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
+            word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
             # for i_sent in range(1):
             for i_sent in range(batch_size):
                 print("sent"+str(i_sent))
@@ -746,11 +747,12 @@ def get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, wor
         tokens = nlp.tokenizer(feature_text_i_str)
         word_idx_list_i_j = []
         word_raw_list_i_j = []
-        word_full_list_i_j = []
+        #word_full_list_i_j = []
 
         for tok in tokens:
             w = tok.text
-            word_full_list_i_j.append(w)
+            word_raw_list_i_j.append(w)
+            #word_full_list_i_j.append(w)
             #print(w, )
             if w not in word_d2_idx:
                 continue
@@ -758,12 +760,13 @@ def get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, wor
             if w_idx in stop_word_set or w_idx in OOV_set:
                 continue
             word_idx_list_i_j.append(w_idx)
-            word_raw_list_i_j.append(w)
-        return word_idx_list_i_j, word_raw_list_i_j, word_full_list_i_j
+            #word_raw_list_i_j.append(w)
+        #return word_idx_list_i_j, word_raw_list_i_j, word_full_list_i_j
+        return word_idx_list_i_j, word_raw_list_i_j
     word_idx_list = []
     word_idx_rest_list = []
     word_raw_list = []
-    word_full_list = []
+    #word_full_list = []
     word_raw_rest_list = []
     batch_size, num_head = inner_idx_tensor.size()
     inner_idx_tensor_np = inner_idx_tensor.cpu().numpy()
@@ -771,20 +774,22 @@ def get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, wor
         word_idx_list_i = []
         word_idx_rest_list_i = []
         word_raw_list_i = []
-        word_full_list_i = []
+        #word_full_list_i = []
         word_raw_rest_list_i = []
         for j in range(num_head):
             end_idx = inner_idx_tensor_np[b,j]
-            word_idx_list_i_j, word_raw_list_i_j, word_full_list_i_j = get_word_list_from_text(feature_text_i[:end_idx])
+            #word_idx_list_i_j, word_raw_list_i_j, word_full_list_i_j = get_word_list_from_text(feature_text_i[:end_idx])
+            word_idx_list_i_j, word_raw_list_i_j = get_word_list_from_text(feature_text_i[:end_idx])
             #assert len(word_idx_list_i_j) > 0, print(feature_text_i[:end_idx])
             word_idx_list_i.append(word_idx_list_i_j)
             word_raw_list_i.append(word_raw_list_i_j)
-            word_full_list_i.append(word_full_list_i_j)
+            #word_full_list_i.append(word_full_list_i_j)
             if end_idx == len(feature_text_i):
                 word_idx_rest_list_i.append([])
                 word_raw_rest_list_i.append([])
             else:
-                word_idx_rest_list_i_j, word_raw_rest_list_i_j, word_full_rest_list_i_j = get_word_list_from_text(feature_text_i[end_idx:])
+                #word_idx_rest_list_i_j, word_raw_rest_list_i_j, word_full_rest_list_i_j = get_word_list_from_text(feature_text_i[end_idx:])
+                word_idx_rest_list_i_j, word_raw_rest_list_i_j = get_word_list_from_text(feature_text_i[end_idx:])
                 word_idx_rest_list_i.append(word_idx_rest_list_i_j)
                 word_raw_rest_list_i.append(word_raw_rest_list_i_j)
             #count = word_idx_d2_count.get(w_idx,0)
@@ -792,9 +797,10 @@ def get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, wor
         word_idx_list.append(word_idx_list_i)
         word_idx_rest_list.append(word_idx_rest_list_i)
         word_raw_list.append(word_raw_list_i)
-        word_full_list.append(word_full_list_i)
+        #word_full_list.append(word_full_list_i)
         word_raw_rest_list.append(word_raw_rest_list_i)
-    return word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list
+    #return word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list
+    return word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list
 
 def get_topic_emb(basis_norm_pred, word_norm_emb, top_k, batch_size, num_head):
     n_basis = basis_norm_pred.size(1)
@@ -1085,26 +1091,31 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
             top_index_arr = []
             method_name_arr = []
             if topic_models != 'random_vocab':
-                word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
+                #word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
+                word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
             
             if 'random_vocab' in  topic_models:
                 top_value, top_index, word_w_sum_norm = random_vocab_sampling(could_sample_list, word_norm_emb, batch_size, num_head, n_basis, top_k)
-                topic_result_stats.evaluate_topic_models("random_vocab", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("random_vocab", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("random_vocab", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('random_vocab') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
 
             if 'random_word' in topic_models:
                 top_value, top_index, word_w_sum_norm = random_word_sampling(word_idx_list, word_norm_emb, n_basis, top_k)
-                topic_result_stats.evaluate_topic_models("random_word", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("random_word", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("random_word", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('random_word') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
 
             if 'SC_cluster' in topic_models:
                 top_value, top_index, word_w_sum_norm = cluster_sampling(word_idx_list, word_norm_emb, n_basis, top_k, cluster_method="Sparse_coding")
-                topic_result_stats.evaluate_topic_models("SC_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("SC_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("SC_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('SC_cluster') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'kmeans_cluster' in topic_models:
                 top_value, top_index, word_w_sum_norm = cluster_sampling(word_idx_list, word_norm_emb, n_basis, top_k, cluster_method="KMeans")
-                topic_result_stats.evaluate_topic_models("kmeans_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("kmeans_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("kmeans_cluster", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('kmeans_cluster') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'LDA' in topic_models or 'global_centers' in topic_models:
@@ -1112,17 +1123,20 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
 
             if 'LDA_org' in topic_models:
                 top_value, top_index, word_w_sum_norm = select_fixed_lda_topics(context_norm_emb, lda_top_word_value, lda_top_word_index, lda_fixed_topic_emb, n_basis)
-                topic_result_stats.evaluate_topic_models("LDA_org", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("LDA_org", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("LDA_org", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('LDA_org') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'LDA_plus' in topic_models:
                 top_value, top_index, word_w_sum_norm = select_dynamic_lda_topics(context_norm_emb, word_norm_emb, lda_word_prob_tensor, n_basis, top_k)
-                topic_result_stats.evaluate_topic_models("LDA_plus", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("LDA_plus", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("LDA_plus", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('LDA_plus') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'global_centers' in topic_models:
                 top_value, top_index, word_w_sum_norm = select_fixed_lda_topics(context_norm_emb, w_emb_top_word_value, w_emb_top_word_index, word_norm_emb_w_sum_global, n_basis)
-                topic_result_stats.evaluate_topic_models("global_centers", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("global_centers", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("global_centers", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('global_centers') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
             
             if 'NSD' in topic_models:
@@ -1136,7 +1150,8 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
                 #word_norm_emb_top = word_norm_emb[top_index,:]
                 #word_norm_emb_w_sum = torch.sum( word_norm_emb_top * top_value.unsqueeze(-1), dim = 2)/ top_value.unsqueeze(-1).sum(dim = 2)
                 #word_w_sum_norm = word_norm_emb_w_sum / (0.000000000001 + word_norm_emb_w_sum.norm(dim = -1, keepdim=True))
-                topic_result_stats.evaluate_topic_models("NSD", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                #topic_result_stats.evaluate_topic_models("NSD", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_full_list, idx2word_freq, word_norm_emb)
+                topic_result_stats.evaluate_topic_models("NSD", top_value, top_index, word_w_sum_norm, word_idx_list, word_idx_rest_list, word_raw_list, idx2word_freq, word_norm_emb)
                 method_name_arr.append('NSD') ; top_value_arr.append(top_value) ; top_index_arr.append(top_index)
 
             print_basis_text(feature, idx2word_freq, top_value_arr, top_index_arr, method_name_arr, i_batch, outf, tokenizer_GPT2, inner_idx_tensor, readable_context)
@@ -1193,7 +1208,8 @@ def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_condi
             batch_size, num_head = inner_idx_tensor.size()
 
             #if topic_mode != 'random_vocab':
-            word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
+            #word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list, word_full_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
+            word_idx_list, word_idx_rest_list, word_raw_list, word_raw_rest_list = get_word_list_spacy(inner_idx_tensor, feature_text, tokenizer_GPT2, nlp, word_d2_idx, stop_word_set, OOV_set)
             
             if 'LDA' in topic_mode or 'global_centers' in topic_mode:
                 context_norm_emb = compose_context_emb(word_idx_list, word_norm_emb)
