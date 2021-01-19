@@ -65,7 +65,8 @@ def sample_statistics(selected_topic_idx, generated_sent, top_index_im, idx2word
 def perplexity(model, context, generated_sent, tokenizer):
     feature = context
     feature_generated = generated_sent
-    feature_empty = torch.tensor((), device = "cuda", dtype=torch.long).new_full((feature.shape[0], feature.shape[1]), -100)
+    device = next(model.parameters()).device
+    feature_empty = torch.tensor((), device = device, dtype=torch.long).new_full((feature.shape[0], feature.shape[1]), -100)
     feature = torch.cat((feature, feature_generated), dim=1)
     feature_generated = torch.cat((feature_empty, feature_generated), dim=1)
     outputs_GPT2LMHeadModel= model(feature, labels=feature_generated)
@@ -172,11 +173,11 @@ class result_statistics:
         for model_name, model in self.model_results.items():
             model["batch count"] += 1
             unigram, bigram = model["ngram"].diversity_n()
-            print(model["ngram"].diversity_n())
+            #print(model["ngram"].diversity_n())
             model["unigram"] += unigram
             model["bigram"] += bigram
             model["ngram"] = ngram()
-            print(model["ngram"].diversity_n())
+            #print(model["ngram"].diversity_n())
 
 
     def print(self):
