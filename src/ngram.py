@@ -30,7 +30,7 @@ class ngram:
         if len(self.unigram_list) == 0:
             return 0, 0
         #print(self.bigram_list)
-        return len(set(self.unigram_list))/len(self.unigram_list), len(set(self.bigram_list))/len(self.bigram_list)
+        return len(set(self.unigram_list))/(1e-15 + len(self.unigram_list)), len(set(self.bigram_list))/(1e-15+len(self.bigram_list))
 
 def main():
     n = ngram()
