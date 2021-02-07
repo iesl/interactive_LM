@@ -1,6 +1,8 @@
 import getopt
 import sys
-from transformers import GPT2Tokenizer
+sys.path.insert(0, sys.path[0]+'/..')
+#from transformers import GPT2Tokenizer
+from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
 
 #help_msg = '-i <input_file_path> -t <tokenize_sents> -o <output_file_path>'
 help_msg = '-i <input_file_path> -o <output_file_path>'

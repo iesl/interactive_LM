@@ -8,6 +8,7 @@ from csv import writer
 #import torch.utils.data
 #import coherency_eval
 
+sys.path.insert(0, sys.path[0]+'/..')
 from utils import seed_all_randomness, load_corpus, loading_all_models, str2bool, raw_sent_dataset, load_idx2word_freq
 #from run_pplm import pplm
 from run_pplm_fine_tuned import pplm
@@ -26,9 +27,9 @@ parser.add_argument('--data', type=str, default='./data/processed/wiki2016_gpt2/
                     help='location of the data corpus')
 parser.add_argument('--tensor_folder', type=str, default='tensors_10000000_min100',
                     help='location of the data corpus')
-parser.add_argument('--checkpoint_topics', type=str, default='./models/',
+parser.add_argument('--checkpoint_topics', type=str, default='',
                     help='topical model checkpoint to use')
-parser.add_argument('--checkpoint_conditional', type=str, default='./models/',
+parser.add_argument('--checkpoint_conditional', type=str, default='',
                     help='conditional LM model checkpoint to use')
 parser.add_argument('--checkpoint_org', type=str, default='',
                     help='original LM model checkpoint to use')
@@ -44,9 +45,7 @@ parser.add_argument('--csv_outf', type=str, default='gen_log/output.csv',
                     help='output file for generated text')
 parser.add_argument('--use_corpus', type=str, default='wiki',
                     help='which corpus format we want to load. Could be wiki or STS')
-#parser.add_argument('--STS_location', type=str, default='/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/dataset_testing/STS/sts_all_years_test',
-#parser.add_argument('--STS_location', type=str, default='/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/dataset_testing/STS/sts_all_years_test_longer_uniq',
-parser.add_argument('--STS_location', type=str, default='/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/dataset_testing/STS/stsbenchmark/sts-train_longer_uniq.csv',
+parser.add_argument('--STS_location', type=str, default='',
                     help='If --use_corpus is STS, load the testing file from this path')
 
 ###system
@@ -106,8 +105,10 @@ seed_all_randomness(args.seed,args.cuda_topics)
 print("Loading data")
 ########################
 
-device_topics = torch.device("cuda:0" if args.cuda_topics else "cpu")
-device_conditional = torch.device("cuda:1" if args.cuda_conditional else "cpu")
+#device_topics = torch.device("cuda:0" if args.cuda_topics else "cpu")
+#device_conditional = torch.device("cuda:1" if args.cuda_conditional else "cpu")
+device_topics = torch.device("cuda" if args.cuda_topics else "cpu")
+device_conditional = torch.device("cuda" if args.cuda_conditional else "cpu")
 device_pplm = torch.device("cuda" if args.cuda_conditional else "cpu")
 device_gpt2 = "cuda" if torch.cuda.is_available() else "cpu"
 #print(args.cuda_conditional, device_conditional)
@@ -218,10 +219,11 @@ print("model condition:", next(model_condition.parameters()).device)
 
 
 #load pplm model
-model_name_pplm = 'gpt2'
+if args.topic_mode == 'NSD':
+    model_name_pplm = 'gpt2'
 
-#pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, device = device_pplm)
-pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, checkpoint = args.checkpoint_org_for_pplm, device = device_pplm)
+    #pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, device = device_pplm)
+    pplm_model = pplm(seed = 0, pretrained_model = model_name_pplm, checkpoint = args.checkpoint_org_for_pplm, device = device_pplm)
 
 
 
@@ -268,4 +270,4 @@ with open(args.csv_outf, 'w', encoding='utf-8') as csvOutf:
             run_eval = True   
             if args.use_corpus == 'STS':
                 run_eval = False
-            utils_testing.testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path, csvOutf, args.readable_context, run_eval, args.use_corpus, idx_l2_type)
+            utils_testing.testing_topic_baseline(model_condition, gpt2_model, device_conditional, args.num_sent_gen, args.gen_sent_len, dataloader_test, word_norm_emb, idx2word_freq, outf, args.n_basis, args.max_batch_num, tokenizer_GPT2, args.bptt_conditional, args.topic_mode, stop_word_set, parallel_encoder, parallel_decoder, args.de_en_connection, args.LDA_model_path, args.word_emb_center_path, csvOutf, args.readable_context, run_eval, args.use_corpus, idx_l2_type)

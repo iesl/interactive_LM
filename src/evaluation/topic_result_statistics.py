@@ -2,6 +2,9 @@ import torch
 import os
 import math
 import numpy as np
+
+import sys
+sys.path.insert(0, sys.path[0]+'/..')
 import utils_testing
 
 class topic_result_statistics:

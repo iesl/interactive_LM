@@ -11,7 +11,8 @@ import torch.utils.data
 import json
 import math
 import torch.nn.functional as F
-from transformers import GPT2Tokenizer
+#from transformers import GPT2Tokenizer
+from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
 from utils import str2bool
 #sys.path.insert(0, sys.path[0]+'/testing/sim')
 import math
@@ -1161,7 +1162,7 @@ def testing_all_topic_baselines(dataloader, parallel_encoder, parallel_decoder, 
         topic_result_stats.generate_report(sys.stdout)
 
 
-def testing_topic_baseline(model_condition, pplm_model, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, word_emb_center_path, csvOutf, readable_context = False, run_eval = True, use_corpus='wiki', idx_l2_type = []):
+def testing_topic_baseline(model_condition, gpt2_model, device_conditional, num_sent_gen, gen_sent_len, dataloader, word_norm_emb, idx2word_freq, outf, n_basis, max_batch_num, tokenizer_GPT2, bptt_conditional, topic_mode, stop_word_set, parallel_encoder, parallel_decoder, de_en_connection, LDA_model_path, word_emb_center_path, csvOutf, readable_context = False, run_eval = True, use_corpus='wiki', idx_l2_type = []):
     top_k = 5
     nlp = English()
     word_d2_idx = {}
