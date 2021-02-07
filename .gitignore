@@ -1,4 +1,5 @@
 resources/*
+!resources/stop_word_list
 gen_log/*
 eval_log/*
 dataset_testing/*
