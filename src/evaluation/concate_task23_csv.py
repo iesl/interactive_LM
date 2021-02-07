@@ -1,24 +1,47 @@
 import csv
 import random
+import getopt
+import sys
 
-input_dir = './gen_log'
+help_msg = '-p <input_prefix> -o <output_path> -m <method_list_str>'
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "p:o:m:")
+except getopt.GetoptError:
+    print(help_msg)
+    sys.exit(2)
+for opt, arg in opts:
+    if opt == '-h':
+        print(help_msg)
+        sys.exit()
+    elif opt in ("-p"):
+        input_prefix = arg
+    elif opt in ("-o"):
+        output_path = arg
+    elif opt in ("-m"):
+        method_list_str = arg
+
+method_list = method_list_str.split()
+
+#input_dir = './gen_log'
 #input_prefix = 'output_'
 #input_prefix = 'output_STS_'
-input_prefix = 'output_STSb_'
 #input_suffix = '_task23_1b.csv'
-input_suffix = '_task23_1b_long_example.csv'
+#input_suffix = '_task23_1b_long_example.csv'
+input_suffix = '.csv'
 #method_list = ['kmeans_global', 'kmeans_local', 'LDA', 'NSD', 'sample_local']
 #method_list = ['kmeans_global', 'kmeans_local', 'NSD']
-method_list = ['LDA_org', 'kmeans_global', 'kmeans_local', 'NSD_3w']
+#method_list = ['LDA_org', 'kmeans_global', 'kmeans_local', 'NSD_3w']
 #output_path = './gen_log/output_task23_1b.csv'
 #output_path = './gen_log/output_STS_task23_1b.csv'
 #output_path = './gen_log/output_STS_task23_1b_long.csv'
-output_path = './gen_log/output_STSb_task23_1b_LDA_gkmeans_3w_long_example.csv'
+#output_path = './gen_log/output_STSb_task23_1b_LDA_gkmeans_3w_long_example.csv'
 context_d2_method_d2_line = {}
 method_d2_UTF8_count = {}
 
 for method in method_list:
-    file_name = input_dir+'/'+input_prefix+method+input_suffix
+    #file_name = input_dir+'/'+input_prefix+method+input_suffix
+    file_name = input_prefix+method+input_suffix
     print(file_name)
     with open(file_name, newline='') as csvfile:
         spamreader = csv.reader(csvfile, delimiter=',', quotechar='"')

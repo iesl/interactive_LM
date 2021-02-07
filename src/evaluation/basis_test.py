@@ -6,7 +6,8 @@ import torch
 #import torch.nn as nn
 #import torch.utils.data
 #import coherency_eval
-
+import sys
+sys.path.insert(0, sys.path[0]+'/..')
 from utils import seed_all_randomness, load_corpus, loading_all_models, str2bool
 import utils_testing
 from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
@@ -44,7 +45,7 @@ parser.add_argument('--dilated_head_span', type=int, default=10,
 parser.add_argument('--max_batch_num', type=int, default=100, 
                     help='number of batches for evaluation')
 parser.add_argument('--topic_models', type=str, default='NSD_vis',
-                    help='The topic models will be tested or visualized. Could be NSD_vis or NSD+kmeans_cluster+random_word+random_vocab')
+                    help='The topic models will be tested or visualized. Could be NSD_vis or NSD+kmeans_cluster+SC_cluster+LDA_org+random_word+random_vocab+global_centers')
 parser.add_argument('--stop_word_file', type=str, default='./resources/stop_word_list',
                     help='path to the file of a stop word list')
 parser.add_argument('--LDA_model_path', type=str, default='',
