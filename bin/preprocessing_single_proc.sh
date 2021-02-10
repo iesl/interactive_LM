@@ -2,8 +2,8 @@
 set -e
 echo "code is running"
 
-#PY_PATH="~/anaconda3/bin/python"
-PY_PATH="~/anaconda3/envs/interactive/bin/python"
+PY_PATH="~/anaconda3/bin/python"
+#PY_PATH="~/anaconda3/envs/interactive/bin/python"
 
 INPUT_JSON_DIR="./data/raw/wikipedia/"
 STOP_WORD_LIST="./resources/stop_word_list"
