@@ -18,9 +18,11 @@ You might need to install some other python packages if you find code needs them
 If your python directory is not \~/anaconda3/bin/python, please change your PY_PATH in the XXX
 
 install spacy (for tokenization)
-
 install nltk (for evaluation and pplm)
+install gensim (for LDA model)
 
+
+Assuming we use one GPU
 
 ## Running IPython Notebook Demo
 
@@ -54,6 +56,7 @@ https://radimrehurek.com/gensim/wiki.html
 LDA
 src/preprocessing/tools/train_LDA_model.py
 
+
 how to compute global word clusters
 src/preprocessing/tools/word_emb_global_clustering.py
 
@@ -71,6 +74,8 @@ Download STS
 Generate CSV
 
 Our crowdsourcing template could be found in 
+
+MTurk_task_templates
 
 ## Citation
 If you use the code in a publication, please cite our paper.
