@@ -5,11 +5,11 @@ Then, we will introduce how to run our training and evaluation code.
 
 ![Image of our model](http://people.umass.edu/hawshiuancha/model_illustration_fig.png)
 
-## Requirements
+## Requirements and Setup
 
 - An Unix like OS with at least one GPU
-- To setup python environment, run `pip install -r requirements.txt`. I use python 3.7 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions might also be fine or just require very simple revision of the code. Our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
-- If your python directory is not `~/anaconda3/bin/python`, please change your PY_PATH in the all the scripts in `./bin`
+- To set up the python environment, run `pip install -r requirements.txt`. I use python 3.7 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions might also be fine or just require very simple revision of the code. Our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
+- If your python path is not `~/anaconda3/bin/python`, change your PY_PATH in the all the scripts in `./bin`
 
 ## Running IPython Notebook Demo
 
