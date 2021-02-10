@@ -8,9 +8,9 @@ Then, we will introduce how to run our training and evaluation code.
 
 ## Requirements
 
-- An Unix like OS 
+- An Unix like OS with at least one GPU
 - I use python 3.7.5 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions should also be fine or just require very simple revision of the code.
-- In addition to python and pytorch, our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), and nltk (for running evaluation and pplm).
+- In addition to python and pytorch, our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
 - You might need to install some other python packages if you find code needs them but you haven't installed it. 
 - If your python directory is not `~/anaconda3/bin/python`, please change your PY_PATH in the all the scripts in `./bin`
 
