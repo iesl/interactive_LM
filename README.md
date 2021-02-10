@@ -4,14 +4,11 @@ We will first introduce the how to run the IPython notebook demo by downloading 
 Then, we will introduce how to run our training and evaluation code.
 
 ![Image of our model](http://people.umass.edu/hawshiuancha/model_illustration_fig.png)
-![test](https://drive.google.com/file/d/102i0idRK5bAaz7X2pHLWHVUTSTmIFlQH/view)
 
 ## Requirements
 
 - An Unix like OS with at least one GPU
-- I use python 3.7.5 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions should also be fine or just require very simple revision of the code.
-- In addition to python and pytorch, our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
-- You might need to install some other python packages if you find code needs them but you haven't installed it. 
+- To setup python environment, run `pip install -r requirements.txt`. I use python 3.7 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions might also be fine or just require very simple revision of the code. Our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
 - If your python directory is not `~/anaconda3/bin/python`, please change your PY_PATH in the all the scripts in `./bin`
 
 ## Running IPython Notebook Demo
@@ -53,7 +50,7 @@ Then, we will introduce how to run our training and evaluation code.
 ## Citation
 If you use the code in a publication, please cite our paper.
 ```
-Haw-Shiuan Chang, Jiaming Yuan, Mohit Iyyer and Andrew McCallum,
+Haw-Shiuan Chang, Jiaming Yuan, Mohit Iyyer, and Andrew McCallum,
 “Changing the Mind of Transformers for Topically-Controllable Language Generation.” 
 Conference of the European Chapter of the Association for Computational Linguistics (EACL), 2021
 ```

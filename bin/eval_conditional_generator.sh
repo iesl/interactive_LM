@@ -2,8 +2,9 @@
 set -e
 
 PY_PATH='~/anaconda3/bin/python'
+#PY_PATH='~/anaconda3/envs/interactive/bin/python'
 AUTO_EVAL='Y'
-OUTPUT_CSV_FOR_MTURK='Y'
+OUTPUT_CSV_FOR_MTURK='N'
 
 GENERATION_MODEL_DIR='./models/conditional_all-20200106-235956'
 TOPIC_MODEL_DIR='./models/future_topic_all-20200106-222318'

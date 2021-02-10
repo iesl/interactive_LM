@@ -1,6 +1,6 @@
 import getopt
 import sys
-sys.path.insert(0, sys.path[0]+'/..')
+sys.path.insert(0, sys.path[0]+'/../..')
 #from transformers import GPT2Tokenizer
 from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
 

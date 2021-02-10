@@ -2,10 +2,11 @@
 set -e
 
 PY_PATH='~/anaconda3/bin/python'
+#PY_PATH="~/anaconda3/envs/interactive/bin/python"
 TRAIN_FROM_SCRATCH='Y'
-#DATA_DIR='./data/processed/wiki2016_gpt2_small/'
 DATA_DIR='./data/processed/wiki2016_gpt2/'
-EMB_FILE='/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/resources/glove.840B.300d_filtered_wiki2016_min100.txt'
+#DATA_DIR='./data/processed/wiki2016_gpt2/'
+EMB_FILE='./resources/glove.840B.300d.txt'
 
 if [ $TRAIN_FROM_SCRATCH == "Y" ]; then
     OUPUT_PATH_PREFIX='./models/future_topic_all'
