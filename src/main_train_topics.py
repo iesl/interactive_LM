@@ -28,7 +28,7 @@ parser.add_argument('--tensor_folder', type=str, default='tensors_all_min100',
                     help='location of the data corpus')
 parser.add_argument('--save', type=str,  default='./models/',
                     help='path to save the final model')
-parser.add_argument('--emb_file', type=str, default='./resources/glove.840B.300d_filtered_wiki2016_min100.txt',
+parser.add_argument('--emb_file', type=str, default='./resources/glove.840B.300d.txt',
                     help='path to the file of a word embedding file')
 
 parser.add_argument('--batch_size', type=int, default=20, metavar='N',
@@ -60,7 +60,6 @@ parser.add_argument('--small_batch_size', type=int, default=-1,
 parser.add_argument('--coeff_opt', type=str, default='lc',
                     help='Could be max or lc')
 parser.add_argument('--coeff_opt_algo', type=str, default='rmsprop',
-#parser.add_argument('--coeff_opt_algo', type=str, default='sgd_bmm',
                     help='Could be sgd_bmm, sgd, asgd, adagrad, rmsprop, and adam')
 parser.add_argument('--training_split_num', type=int, default=2,
                     help='We want to split training corpus into how many subsets. Splitting training dataset seems to make pytorch run much faster and we can store and eval the model more frequently')
@@ -68,37 +67,18 @@ parser.add_argument('--start_training_split', type=int, default=0,
                     help='We want to split training corpus into how many subsets. Splitting training dataset seems to make pytorch run much faster and we can store and eval the model more frequently')
 parser.add_argument('--valid_per_epoch', type=int, default=2,
                     help='Number of times we want to run through validation data and save model within an epoch')
-#parser.add_argument('--dropout', type=float, default=0.4,
-#                    help='dropout applied to layers (0 = no dropout)')
-#parser.add_argument('--dropouth', type=float, default=0.3,
-#                    help='dropout for rnn layers (0 = no dropout)')
-#parser.add_argument('--dropouti', type=float, default=0.65,
-#                    help='dropout for input embedding layers (0 = no dropout)')
-#parser.add_argument('--dropoute', type=float, default=0.1,
-#                    help='dropout to remove words from embedding layer (0 = no dropout)')
-#parser.add_argument('--dropoutl', type=float, default=-0.2,
-#                    help='dropout applied to layers (0 = no dropout)')
-#parser.add_argument('--wdrop', type=float, default=0.5,
-#                    help='amount of weight dropout to apply to the RNN hidden to hidden matrix')
-#parser.add_argument('--tied', action='store_false',
-#                    help='tie the word embedding and softmax weights')
 
 
 ###decoder
 #both
 parser.add_argument('--de_model', type=str, default='TRANS',
                     help='type of decoder model (LSTM, LSTM+TRANS, TRANS+LSTM, TRANS)')
-#parser.add_argument('--de_coeff_model', type=str, default='LSTM',
-#                    help='type of decoder model to predict coefficients (LSTM, TRANS)')
 parser.add_argument('--n_basis', type=int, default=10,
                     help='number of basis we want to predict')
-#parser.add_argument('--n_further', type=int, default=20,
 parser.add_argument('--n_further', type=int, default=50,
                     help='number of words we want to look ahead')
 parser.add_argument('--L1_losss_B', type=float, default=0.2,
                     help='L1 loss for the coefficient matrix')
-#parser.add_argument('--linear_mapping_dim', type=int, default=0,
-#                    help='map the input embedding by linear transformation')
 parser.add_argument('--positional_option', type=str, default='linear',
                     help='options of encode positional embedding into models (linear, cat, add)')
 parser.add_argument('--dropoutp', type=float, default=0.5,
@@ -122,16 +102,8 @@ parser.add_argument('--cuda', type=str2bool, nargs='?', default=True,
                     help='use CUDA')
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
-#parser.add_argument('--alpha', type=float, default=2,
-#                    help='alpha L2 regularization on RNN activation (alpha = 0 means no regularization)')
-#parser.add_argument('--beta', type=float, default=1,
-#                    help='beta slowness regularization applied on RNN activiation (beta = 0 means no regularization)')
 parser.add_argument('--continue_train', action='store_true',
                     help='continue train from a checkpoint')
-#parser.add_argument('--n_experts', type=int, default=10,
-#                    help='number of experts')
-#parser.add_argument('--max_seq_len_delta', type=int, default=40,
-#                    help='max sequence length')
 parser.add_argument('--single_gpu', default=False, action='store_true', 
                     help='use single GPU')
 
@@ -145,12 +117,6 @@ print("Set up environment")
 
 assert args.training_split_num >= args.valid_per_epoch
 
-#if args.nhidlast < 0:
-#    args.nhidlast = args.emsize
-#if args.nhidlast2 < 0:
-#    args.nhidlast2 = args.emsize
-#if args.dropoutl < 0:
-#    args.dropoutl = args.dropouth
 if args.small_batch_size < 0:
     args.small_batch_size = args.batch_size
 assert args.batch_size % args.small_batch_size == 0, 'batch_size must be divisible by small_batch_size'
@@ -230,8 +196,6 @@ else:
     encoder = GPT2Model.from_pretrained(model_name, state_dict = encoder_state_dict)
     decoder.load_state_dict(torch.load(os.path.join(args.save, 'decoder.pt'), map_location=device))
 
-#model_further = torch.tensor(0.)
-#model_further = model_code.RNNModel_further(args.model, args.nhidlast, args.nhidlast2, args.emsize, 1, args.n_basis, 0, 0)
 
 #model.config_class.n_embd
 #print(model.config_class.__dict__)
