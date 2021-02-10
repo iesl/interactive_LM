@@ -24,11 +24,11 @@ from utils import seed_all_randomness, create_exp_dir, save_checkpoint, load_idx
 parser = argparse.ArgumentParser(description='PyTorch Train Future Topic Prediction')
 parser.add_argument('--data', type=str, default='./data/processed/wiki2016_gpt2/',
                     help='location of the data corpus')
-parser.add_argument('--tensor_folder', type=str, default='tensors_10000000_min100',
+parser.add_argument('--tensor_folder', type=str, default='tensors_all_min100',
                     help='location of the data corpus')
 parser.add_argument('--save', type=str,  default='./models/',
                     help='path to save the final model')
-parser.add_argument('--emb_file', type=str, default='/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/resources/glove.840B.300d_filtered_wiki2016_min100.txt',
+parser.add_argument('--emb_file', type=str, default='./resources/glove.840B.300d_filtered_wiki2016_min100.txt',
                     help='path to the file of a word embedding file')
 
 parser.add_argument('--batch_size', type=int, default=20, metavar='N',
@@ -447,10 +447,17 @@ else:
     optimizer_d = torch.optim.Adam(decoder.parameters(), lr=args.lr, weight_decay=args.wdecay)
 
 if args.continue_train:
-    optimizer_e_state_dict = torch.load(os.path.join(args.save, 'optimizer_e.pt'), map_location=device)
-    optimizer_e.load_state_dict(optimizer_e_state_dict)
-    optimizer_d_state_dict = torch.load(os.path.join(args.save, 'optimizer_d.pt'), map_location=device)
-    optimizer_d.load_state_dict(optimizer_d_state_dict)
+    try:
+        optimizer_e_state_dict = torch.load(os.path.join(args.save, 'optimizer_e.pt'), map_location=device)
+        optimizer_e.load_state_dict(optimizer_e_state_dict)
+    except:
+        print('randomly initialize encoder optimizer')
+    try:
+        optimizer_d_state_dict = torch.load(os.path.join(args.save, 'optimizer_d.pt'), map_location=device)
+        optimizer_d.load_state_dict(optimizer_d_state_dict)
+    except:
+        print('randomly initialize decoder optimizer')
+        
 
 lr = args.lr
 best_val_loss = None

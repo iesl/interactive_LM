@@ -8,6 +8,7 @@ from csv import writer
 #import torch.utils.data
 #import coherency_eval
 
+import sys
 sys.path.insert(0, sys.path[0]+'/..')
 from utils import seed_all_randomness, load_corpus, loading_all_models, str2bool, raw_sent_dataset, load_idx2word_freq
 #from run_pplm import pplm
@@ -253,7 +254,6 @@ with open(args.csv_outf, 'w', encoding='utf-8') as csvOutf:
             outf.write('Testing Prompts:\n\n')
             csvOutf = writer(csvOutf)
             csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic_0', 'topic_1', 'topic_2', 'topic_3', 'topic_4', 'topic_5', 'topic_6', 'topic_7', 'topic_8', 'topic_9', 'selected_topics', 'sentence', 'model', 'other'])
-            #csvOutf.writerow(['paragraph_previous', 'paragraph_last', 'topic_0', 'topic_1', 'topic_2', 'topic_3', 'topic_4', 'topic_5', 'topic_6', 'topic_7', 'topic_8', 'topic_9', 'selected topics', 'sentence', 'model'])
             run_eval = True   
             if args.use_corpus == 'STS':
                 run_eval = False

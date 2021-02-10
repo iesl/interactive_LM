@@ -55,7 +55,7 @@ print("Processing "+ input_file_name)
 text_buffer = []
 for line in f_in:
     input_json = json.loads(line)
-    text_buffer.append(input_json['text'].replace("'''",'').replace("''",''))
+    text_buffer.append(input_json['text'].replace("'''",'').replace("''",'').replace('"'))
     #input_json = json.loads(line.decode('utf-8'))
 
 

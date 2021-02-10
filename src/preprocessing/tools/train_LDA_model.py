@@ -3,9 +3,12 @@ import gensim
 
 #num_topics = 300
 num_topics = 150
-wiki_dict_path = '/iesl/data/word_embedding/wikipedia/wiki2016_wordids.txt.bz2'
-wiki_tfidf_path = '/iesl/data/word_embedding/wikipedia/wiki2016_tfidf.mm'
-output_path = '/iesl/canvas/hschang/language_modeling/interactive_LM/models/LDA/LDA_wiki2016_'+str(num_topics)
+#wiki_dict_path = '/iesl/data/word_embedding/wikipedia/wiki2016_wordids.txt.bz2'
+#wiki_tfidf_path = '/iesl/data/word_embedding/wikipedia/wiki2016_tfidf.mm'
+#output_path = '/iesl/canvas/hschang/language_modeling/interactive_LM/models/LDA/LDA_wiki2016_'+str(num_topics)
+wiki_dict_path = './data/raw/wikipedia/wiki2016_wordids.txt.bz2'
+wiki_tfidf_path = './data/raw/wikipedia/wiki2016_tfidf.mm'
+output_path = './models/LDA/LDA_wiki2016_'+str(num_topics)
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 

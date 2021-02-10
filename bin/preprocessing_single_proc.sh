@@ -6,6 +6,8 @@ PY_PATH="~/anaconda3/bin/python"
 
 #INPUT_JSON_DIR="/iesl/data/nmonath-wiki-json/json/"
 INPUT_JSON_DIR="/iesl/data/word_embedding/wikipedia/small_subset_test"
+STOP_WORD_LIST="./resources/stop_word_list"
+
 OUTPUT_SPACY_DIR="./data/raw/wiki2016_both_small/"
 #OUTPUT_SPACY_DIR="/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/data/raw/wiki2016_both_small/"
 OUTPUT_GPT2_DIR="./data/raw/wiki2016_gpt2_order_small/"
@@ -13,7 +15,6 @@ OUTPUT_GPT2="./data/raw/wiki2016_gpt2_small.txt"
 OUTPUT_GPT2_PROC_DIR="./data/processed/wiki2016_gpt2_small/"
 OUTPUT_GPT2_TENSOR_DIR="$OUTPUT_GPT2_PROC_DIR/tensors_all_min100/"
 OUTPUT_DICT_FILE="$OUTPUT_GPT2_TENSOR_DIR/dict_idx_compact"
-STOP_WORD_LIST="./resources/stop_word_list"
 
 mkdir -p $OUTPUT_SPACY_DIR
 mkdir -p $OUTPUT_GPT2_DIR

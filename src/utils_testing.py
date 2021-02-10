@@ -19,7 +19,6 @@ import math
 import random
 import re
 import colorama
-import run_pplm
 from ngram import ngram
 from result_statistics import result_statistics
 from topic_result_statistics import topic_result_statistics
@@ -481,9 +480,12 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 else:
                     prompt_type_info = ''
                 csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, cond_sent_list_out[j], 'model condition '+ str(j), prompt_type_info])
+                print_sampled_sent(selected_topic_idx, cond_sent_list[j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
                 if gen_sent_tensor_org.size(0) > 0:
                     csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, org_sent_list_out[j], 'Original '+ str(j), prompt_type_info])
+                    print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
                 csvOutf.writerow([prev, last, generateString(topics[0]), generateString(topics[1]), generateString(topics[2]), generateString(topics[3]), generateString(topics[4]), generateString(topics[5]), generateString(topics[6]), generateString(topics[7]), generateString(topics[8]), generateString(topics[9]), selected_topics, pplm_sent_list_out[j], 'PPLM '+ str(j), prompt_type_info])
+                print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
             outf.write('\n\n')
             if not run_eval:
                 continue
@@ -494,7 +496,7 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                 #generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor[i_sent, m, j, :].tolist()] )
                 #generated_sent = tokenizer_GPT2.decode( gen_sent_tensor[i_sent, m, j, :] )
                 generated_sent = cond_sent_list[j]
-                print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
+                #print_sampled_sent(selected_topic_idx, generated_sent, top_index[i_sent,m,:,:], idx2word_freq, outf, 'conditional '+ str(j))
                 result_stats.update("Model condition", gen_sent_tensor[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
             result_stats.update_self_BLEU("Model condition")
             if gen_sent_tensor_org.size(0) > 0:
@@ -502,11 +504,11 @@ def print_basis_conditional_text(feature, pplm_sent, idx2word_freq, top_value, t
                     #generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in gen_sent_tensor_org[i_sent, m, j, :].tolist()] )
                     #generated_sent_org = tokenizer_GPT2.decode( gen_sent_tensor_org[i_sent, m, j, :] )
                     generated_sent_org = org_sent_list[j]
-                    print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
+                    #print_sampled_sent(selected_topic_idx, generated_sent_org, top_index[i_sent,m,:,:], idx2word_freq, outf, 'original '+ str(j))
                     result_stats.update("Original", gen_sent_tensor_org[i_sent, m, j, :], feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
                 result_stats.update_self_BLEU("Original")
             for j in range(num_sent_gen):
-                print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
+                #print_sampled_sent(selected_topic_idx, pplm_sent[i_sent][m][j], top_index[i_sent,m,:,:], idx2word_freq, outf, 'pplm model '+ str(j))
                 sentence = torch.tensor(tokenizer_GPT2.encode(pplm_sent[i_sent][m][j]), device="cuda", dtype=torch.long)
                 result_stats.update("PPLM", sentence, feature[i_sent,:end], selected_topic_idx, top_index[i_sent,m,:,:], idx2word_freq, tokenizer_GPT2, word_raw_list[i_sent][m], word_raw_rest_list[i_sent][m], m)
             result_stats.update_self_BLEU("PPLM")

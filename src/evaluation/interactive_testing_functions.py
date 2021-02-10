@@ -92,13 +92,13 @@ def load_all_components(args):
 
 def show_future_topics(prompt, encoder, decoder, word_norm_emb, n_basis, top_k, bptt, idx2word_freq, tokenizer_GPT2, device_topics):
     tokenized_text = tokenizer_GPT2.tokenize(prompt, add_prefix_space=True)
-    print(tokenized_text)
+    #print(tokenized_text)
     indexed_tokens = tokenizer_GPT2.convert_tokens_to_ids(tokenized_text)
     start_idx = len(indexed_tokens) - bptt
     if start_idx > 0:
         indexed_tokens = indexed_tokens[start_idx:]
     feature = torch.tensor(indexed_tokens, dtype=torch.long, device=device_topics).unsqueeze(0)
-    output_emb, past = parallel_encoder(feature)
+    output_emb, past = encoder(feature)
     output_emb_last = output_emb[:,-1,:]
     basis_pred = decoder(output_emb_last)
     basis_norm_pred = basis_pred / (0.000000000001 + basis_pred.norm(dim = 2, keepdim=True) )

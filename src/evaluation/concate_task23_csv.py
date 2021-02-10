@@ -21,7 +21,8 @@ for opt, arg in opts:
     elif opt in ("-m"):
         method_list_str = arg
 
-method_list = method_list_str.split()
+method_list = method_list_str.split('|')
+print(method_list_str)
 
 #input_dir = './gen_log'
 #input_prefix = 'output_'
