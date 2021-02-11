@@ -43,7 +43,7 @@ Then, we will introduce how to run our training and evaluation code.
 ## Running Evaluation using Amazon Mechanical Turk
 
 - Download STSb dataset from [here](https://ixa2.si.ehu.eus/stswiki/index.php/STSbenchmark)
-- Preprocessing STS using `./src/evaluation/filter_STS_for_GPT2.py`
+- Preprocessing STS using `./src/evaluation/filter_STS_for_GPT2.py` and remove the duplication by `sort sts-train_longer.csv | uniq  > sts-train_longer_uniq.csv`
 - Set OUTPUT_CSV_FOR_MTURK='Y' in `./bin/train_conditional_generator.sh` and `./bin/eval_option_generator.sh` to generate CSV files for MTurk tasks.
 - Our crowdsourcing templates and responses from workers could be found in `./MTurk_eval`
 
