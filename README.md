@@ -48,7 +48,7 @@ Then, we will introduce how to run our training and evaluation code.
 - Our crowdsourcing templates and responses from workers could be found in `./MTurk_eval`
 
 ## Citation
-If you use the code in a publication, please cite our paper.
+If you use the code in a publication, please cite [our paper](http://arxiv.org/abs/2103.15335).
 ```
 Haw-Shiuan Chang, Jiaming Yuan, Mohit Iyyer, and Andrew McCallum,
 “Changing the Mind of Transformers for Topically-Controllable Language Generation.” 
