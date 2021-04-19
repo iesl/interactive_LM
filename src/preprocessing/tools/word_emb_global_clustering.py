@@ -11,7 +11,7 @@ cluster_num = 1000
 #emb_file = '/iesl/canvas/hschang/language_modeling/NSD_for_sentence_embedding/resources/glove.840B.300d_filtered_wiki2016_min100.txt'
 #dictionary_input_name = './data/processed/wiki2016_gpt2/dictionary_index'
 #output_file = '/iesl/canvas/hschang/language_modeling/interactive_LM/models/GloVe_clustering/normalized_center_emb_n'+str(cluster_num)
-emb_file = './resources/glove.840B.300d_filtered_wiki2016_min100.txt'
+emb_file = './resources/glove.840B.300d.txt'
 dictionary_input_name = './data/processed/wiki2016_gpt2/dictionary_index'
 output_file = './models/GloVe_clustering/normalized_center_emb_n'+str(cluster_num)
 

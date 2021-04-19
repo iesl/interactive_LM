@@ -62,7 +62,7 @@ def sample_statistics(selected_topic_idx, generated_sent, top_index_im, idx2word
 
     return num_token_hit, num_word_type_hit, num_topic_hit
 
-def perplexity(model, context, generated_sent, tokenizer):
+def perplexity(model, context, generated_sent):
     feature = context
     feature_generated = generated_sent
     device = next(model.parameters()).device
@@ -142,7 +142,7 @@ class result_statistics:
     def update(self, model_name, sentence, context, selected_topic_idx, top_index, idx2word_freq, tokenizer, word_raw_list_i_j=None, word_raw_rest_list_i_j=None, j = None):
         generated_sent = tokenizer.convert_tokens_to_string( [tokenizer._convert_id_to_token(x) for x in sentence.tolist()] )
         num_token_hit, num_word_type_hit, num_topic_hit = sample_statistics(selected_topic_idx, generated_sent, top_index, idx2word_freq)
-        log_perplexity = perplexity(self.gpt2_model, context.unsqueeze(0), sentence.unsqueeze(0), tokenizer)
+        log_perplexity = perplexity(self.gpt2_model, context.unsqueeze(0), sentence.unsqueeze(0))
         if word_raw_list_i_j is not None:
             #context_sents = tokenizer.convert_tokens_to_string( [tokenizer._convert_id_to_token(x) for x in context.tolist()] )
             while j >= len(self.model_results[model_name]['BLEU_count_arr']):

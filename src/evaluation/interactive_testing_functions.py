@@ -16,6 +16,7 @@ from gpt2_model.tokenization_gpt2 import GPT2Tokenizer
 from gpt2_model.modeling_gpt2_condition import GPT2LMHeadModel
 from gpt2_model.configuration_gpt2 import GPT2Config
 
+import colorama
 
 
 
@@ -157,9 +158,15 @@ def conditional_generation(selected_conditions, gen_sent_len, num_sent_gen, word
     truncate_idx = 0
     output = utils_testing.sample_seq(model_condition, feature_expanded, insert_loc_truncated[truncate_idx:], future_emb_chosen_arr[truncate_idx:], gen_sent_len, device_conditional)
     output_org = utils_testing.sample_seq(model_condition, feature_expanded, None, None, gen_sent_len, device_conditional)
+    
+    print(colorama.Fore.BLUE+"Prompt: "+tokenizer_GPT2.decode(feature[0,start_int:end_int])+'\n'+colorama.Style.RESET_ALL)
     for j in range(num_sent_gen):
         generated_sent = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in output[j, :].tolist()] )
+        generated_sent = generated_sent.replace('â',"'").replace('â','-').replace('\n'," ")
         utils_testing.print_sampled_sent(selected_topic_idx.tolist(), generated_sent, top_index[0,:,:], idx2word_freq, sys.stdout, 'conditional '+ str(j), selected_word_idx.tolist())
+    
+    print("\n"+colorama.Fore.BLUE+"Prompt: "+tokenizer_GPT2.decode(feature[0,start_int:end_int])+'\n'+colorama.Style.RESET_ALL)
     for j in range(num_sent_gen):
         generated_sent_org = tokenizer_GPT2.convert_tokens_to_string( [tokenizer_GPT2._convert_id_to_token(x) for x in output_org[j, :].tolist()] )
+        generated_sent_org = generated_sent_org.replace('â',"'").replace('â','-').replace('\n'," ")
         utils_testing.print_sampled_sent(selected_topic_idx.tolist(), generated_sent_org, top_index[0,:,:], idx2word_freq, sys.stdout, 'original '+ str(j), selected_word_idx.tolist())
