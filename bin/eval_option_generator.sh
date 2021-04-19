@@ -1,11 +1,12 @@
 #!/bin/bash
 set -e
 
-PY_PATH='~/anaconda3/bin/python'
+#PY_PATH='~/anaconda3/bin/python'
+PY_PATH='~/anaconda3/envs/interactive/bin/python'
 VISUALIZATION='Y'
 AUTO_EVAL_TOPICS='Y' 
 AUTO_EVAL_GENRATION='Y' #require the conditional generation model
-OUTPUT_CSV_FOR_MTURK='Y' #require the conditional generation model
+OUTPUT_CSV_FOR_MTURK='N' #require the conditional generation model
 TOPIC_MODEL_DIR='./models/future_topic_all-20200106-222318'
 GENERATION_MODEL_DIR='./models/conditional_all-20200106-235956'
 DATA_DIR='./data/processed/wiki2016_gpt2/'

@@ -4,15 +4,12 @@ We will first introduce the how to run the IPython notebook demo by downloading 
 Then, we will introduce how to run our training and evaluation code.
 
 ![Image of our model](http://people.umass.edu/hawshiuancha/model_illustration_fig.png)
-![test](https://drive.google.com/file/d/102i0idRK5bAaz7X2pHLWHVUTSTmIFlQH/view)
 
-## Requirements
+## Requirements and Setup
 
 - An Unix like OS with at least one GPU
-- I use python 3.7.5 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions should also be fine or just require very simple revision of the code.
-- In addition to python and pytorch, our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
-- You might need to install some other python packages if you find code needs them but you haven't installed it. 
-- If your python directory is not `~/anaconda3/bin/python`, please change your PY_PATH in the all the scripts in `./bin`
+- To set up the python environment, run `pip install -r requirements.txt`. I use python 3.7 and pytorch 1.3.1, but I think other python 3 or pytorch > 1.0 versions might also be fine or just require very simple revision of the code. Our codes also use IPython notebook (for running the interactive demo), Spacy (for tokenization), nltk (for running evaluation and pplm), and gensim (for running the LDA baseline).
+- If your python path is not `~/anaconda3/bin/python`, change your PY_PATH in the all the scripts in `./bin`
 
 ## Running IPython Notebook Demo
 
@@ -39,21 +36,21 @@ Then, we will introduce how to run our training and evaluation code.
 ## Running Evaluation using Automatic Metrics
 
 - To evaluate/visualize conditional text generator, update the GENERATION_MODEL_DIR and TOPIC_MODEL_DIR using the model path from the previous step to run `./bin/train_conditional_generator.sh`. 
-- To evaluate/visualize option generator, update the GENERATION_MODEL_DIR and TOPIC_MODEL_DIR and run `./bin/eval_option_generator.sh`. Set VISUALIZATION=‘Y’ to visualize the topics given some randomly selected prompt. Set AUTO_EVAL_TOPICS='Y' to compare the quality of topics from different methods as we did in Table 1 in our EACL paper. Set AUTO_EVAL_GENRATION='Y' to evaluate the topics by the quality of text that is generated given these topics as we did in Table 6 in our paper appendix. 
+- To evaluate/visualize option generator, update the GENERATION_MODEL_DIR and TOPIC_MODEL_DIR and run `./bin/eval_option_generator.sh`. Set VISUALIZATION='Y' to visualize the topics given some randomly selected prompt. Set AUTO_EVAL_TOPICS='Y' to compare the quality of topics from different methods as we did in Table 1 in our EACL paper. Set AUTO_EVAL_GENRATION='Y' to evaluate the topics by the quality of text that is generated given these topics as we did in Table 6 in our paper appendix. 
 - Our scores are stored at the end of each OUT_FILE file when AUTO_EVAL\*='Y'. Our text generator is called "model condition", and our option generator is called NSD_topic in our code, where NSD stands for neural set decoder.
 - In our code, we also evaluate some globally clustering baselines such as LDA and kmeans. In order to test them, you can train a LDA model by following the steps [here](https://radimrehurek.com/gensim/wiki.html). You can also see an example code at `./src/preprocessing/tools/train_LDA_model.py`. For kmeans clustering, we use `./src/preprocessing/tools/word_emb_global_clustering.py`. If you do not want to test them, just remove LDA_org and global_centers from METHOD_LIST
 
 ## Running Evaluation using Amazon Mechanical Turk
 
 - Download STSb dataset from [here](https://ixa2.si.ehu.eus/stswiki/index.php/STSbenchmark)
-- Preprocessing STS using `./src/evaluation/filter_STS_for_GPT2.py`
+- Preprocessing STS using `./src/evaluation/filter_STS_for_GPT2.py` and remove the duplication by `sort sts-train_longer.csv | uniq  > sts-train_longer_uniq.csv`
 - Set OUTPUT_CSV_FOR_MTURK='Y' in `./bin/train_conditional_generator.sh` and `./bin/eval_option_generator.sh` to generate CSV files for MTurk tasks.
 - Our crowdsourcing templates and responses from workers could be found in `./MTurk_eval`
 
 ## Citation
-If you use the code in a publication, please cite our paper.
+If you use the code in a publication, please cite [our paper](http://arxiv.org/abs/2103.15335).
 ```
-Haw-Shiuan Chang, Jiaming Yuan, Mohit Iyyer and Andrew McCallum,
+Haw-Shiuan Chang, Jiaming Yuan, Mohit Iyyer, and Andrew McCallum,
 “Changing the Mind of Transformers for Topically-Controllable Language Generation.” 
 Conference of the European Chapter of the Association for Computational Linguistics (EACL), 2021
 ```
