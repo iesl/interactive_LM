@@ -11,7 +11,7 @@ botocore==1.10.62
 brotlipy==0.7.0
 cachetools @ file:///tmp/build/80754af9/cachetools_1611600262290/work
 catalogue==1.0.0
-certifi==2020.12.5
+certifi==2022.12.7
 cffi @ file:///tmp/build/80754af9/cffi_1606255099073/work
 chardet @ file:///tmp/build/80754af9/chardet_1607706768982/work
 click @ file:///home/linux1/recipes/ci/click_1610990599742/work
